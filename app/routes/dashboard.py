@@ -58,3 +58,27 @@ def audit_list():
     rows = AuditLog.query.filter_by(org_id=g.user.org_id).order_by(AuditLog.id.desc()).limit(100)
     return jsonify([dict(id=r.id, actor=r.actor, action=r.action, entityId=r.entity_id,
                          details=r.details, createdAt=r.created_at) for r in rows])
+@bp.get("/api/me")
+@require_role("viewer")
+def me():
+    return jsonify(id=g.user.id, email=g.user.email,
+                   role=g.user.role, orgId=g.user.org_id)
+
+@bp.get("/api/websites")
+@require_role("viewer")
+def list_websites():
+    rows = Website.query.filter_by(org_id=g.user.org_id).order_by(Website.id)
+    return jsonify([dict(id=w.id, name=w.name, domain=w.domain) for w in rows])
+
+@bp.post("/api/websites")
+@require_role("admin")
+def create_website():
+    data = request.get_json() or {}
+    if not data.get("name") or not data.get("domain"):
+        return jsonify(error="name and domain required"), 400
+    w = Website(org_id=g.user.org_id, name=data["name"], domain=data["domain"])
+    db.session.add(w)
+    db.session.commit()
+    audit(g.user.org_id, f"user:{g.user.id}", "website.created", w.id)
+    return jsonify(id=w.id, name=w.name, domain=w.domain), 201
+
