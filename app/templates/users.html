@@ -1,0 +1,524 @@
+
+{% extends "base.html" %}
+
+{% block title %}User Management | AssetVault{% endblock %}
+{% block page_name %}User Management{% endblock %}
+
+{% block content %}
+<div class="users-page">
+
+    <div class="page-header">
+        <div>
+            <h1>User Management</h1>
+            <p>Manage workspace members and their access permissions.</p>
+        </div>
+        <button type="button" class="primary-button" id="show-create-form">
+            + Add User
+        </button>
+    </div>
+
+    <div id="page-message" class="message" role="status"
+         aria-live="polite" hidden></div>
+
+    <section class="panel" id="create-user-panel" hidden>
+        <div class="panel-header">
+            <div>
+                <h2>Create a user</h2>
+                <p>Create an account and assign its access level.</p>
+            </div>
+        </div>
+
+        <form id="create-user-form">
+            <div class="form-grid">
+                <div class="form-field">
+                    <label for="new-email">Email address</label>
+                    <input
+                        id="new-email"
+                        name="email"
+                        type="email"
+                        maxlength="254"
+                        placeholder="user@company.com"
+                        autocomplete="email"
+                        required
+                    >
+                </div>
+
+                <div class="form-field">
+                    <label for="new-password">Temporary password</label>
+                    <input
+                        id="new-password"
+                        name="password"
+                        type="password"
+                        minlength="12"
+                        placeholder="At least 12 characters"
+                        autocomplete="new-password"
+                        required
+                    >
+                </div>
+
+                <div class="form-field">
+                    <label for="new-role">Access level</label>
+                    <select id="new-role" name="role" required>
+                        <option value="viewer">Viewer — Read-only</option>
+                        <option value="editor">Editor — Upload assets</option>
+                        <option value="admin">Admin — Manage workspace</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="primary-button" id="create-submit">
+                    Create User
+                </button>
+                <button type="button" class="secondary-button" id="cancel-create">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header users-toolbar">
+            <div>
+                <h2>Workspace Members</h2>
+                <p id="user-count">Loading users...</p>
+            </div>
+
+            <div class="toolbar-actions">
+                <input
+                    id="user-search"
+                    type="search"
+                    placeholder="Search by email..."
+                    aria-label="Search users by email"
+                >
+
+                <select id="status-filter" aria-label="Filter users by status">
+                    <option value="all">All accounts</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+
+                <button type="button" class="secondary-button" id="refresh-users">
+                    Refresh
+                </button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Access level</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <tr>
+                        <td colspan="5">Loading users...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="empty-state" class="empty-state" hidden>
+            <h3>No users found</h3>
+            <p>Try another search or create a new workspace member.</p>
+        </div>
+    </section>
+
+</div>
+
+<style>
+    .users-page { display: grid; gap: 24px; }
+    .page-header, .panel-header, .form-actions, .toolbar-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+    }
+    .page-header h1 { margin: 0 0 6px; }
+    .page-header p, .panel-header p {
+        margin: 0;
+        color: #64748b;
+    }
+    .panel {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 24px;
+        min-width: 0;
+    }
+    .panel-header { margin-bottom: 22px; flex-wrap: wrap; }
+    .panel-header h2 { margin: 0 0 6px; font-size: 19px; }
+    .primary-button, .secondary-button {
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .primary-button { background: #6554f0; color: white; }
+    .primary-button:hover { background: #5141d9; }
+    .secondary-button {
+        background: white;
+        border-color: #dbe2ee;
+        color: #263248;
+    }
+    .secondary-button:hover { background: #f8fafc; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+    }
+    .form-field { display: grid; gap: 8px; }
+    .form-field label { font-size: 14px; font-weight: 600; }
+    .form-field input, .form-field select, .toolbar-actions input,
+    .toolbar-actions select, .role-select {
+        width: 100%;
+        min-width: 0;
+        padding: 11px 12px;
+        border: 1px solid #d7deea;
+        border-radius: 8px;
+        background: white;
+        color: #182230;
+        font: inherit;
+    }
+    .form-actions { justify-content: flex-start; margin-top: 22px; }
+    .toolbar-actions { flex-wrap: wrap; }
+    .toolbar-actions input { width: 220px; }
+    .toolbar-actions select { width: 145px; }
+    .table-container { width: 100%; overflow-x: auto; }
+    .users-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .users-table th {
+        padding: 13px 12px;
+        color: #64748b;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        border-bottom: 1px solid #e2e8f0;
+        white-space: nowrap;
+    }
+    .users-table td {
+        padding: 15px 12px;
+        border-bottom: 1px solid #edf0f5;
+        font-size: 14px;
+        vertical-align: middle;
+    }
+    .user-email { font-weight: 600; overflow-wrap: anywhere; }
+    .role-select { min-width: 135px; }
+    .status-pill {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .status-active { color: #167647; background: #e7f8ee; }
+    .status-inactive { color: #9a3412; background: #fff0e8; }
+    .message {
+        padding: 12px 15px;
+        border-radius: 8px;
+        overflow-wrap: anywhere;
+    }
+    .message-success { color: #166534; background: #dcfce7; }
+    .message-error { color: #991b1b; background: #fee2e2; }
+    .empty-state { text-align: center; padding: 35px 12px; }
+    .empty-state p { color: #64748b; }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .small-button { padding: 7px 10px; font-size: 12px; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 760px) {
+        .page-header { align-items: flex-start; flex-wrap: wrap; }
+        .panel { padding: 16px; }
+        .form-grid { grid-template-columns: 1fr; }
+        .toolbar-actions, .toolbar-actions input,
+        .toolbar-actions select { width: 100%; }
+    }
+</style>
+
+<script>
+(() => {
+    const tableBody = document.getElementById("users-table-body");
+    const messageBox = document.getElementById("page-message");
+    const countLabel = document.getElementById("user-count");
+    const searchInput = document.getElementById("user-search");
+    const statusFilter = document.getElementById("status-filter");
+    const createPanel = document.getElementById("create-user-panel");
+    const createForm = document.getElementById("create-user-form");
+    const createButton = document.getElementById("create-submit");
+    const emptyState = document.getElementById("empty-state");
+
+    let users = [];
+    let currentUserId = null;
+
+    function showMessage(message, success = false) {
+        messageBox.textContent = message;
+        messageBox.className = "message " +
+            (success ? "message-success" : "message-error");
+        messageBox.hidden = false;
+    }
+
+    function clearMessage() {
+        messageBox.hidden = true;
+        messageBox.textContent = "";
+    }
+
+    async function api(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            ...options,
+            headers: {
+                ...(options.body ? {"Content-Type": "application/json"} : {}),
+                ...(options.headers || {})
+            }
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(data.message || data.error || `Request failed (${response.status})`);
+        }
+
+        return data;
+    }
+
+    function makeCell(text) {
+        const td = document.createElement("td");
+        td.textContent = text;
+        return td;
+    }
+
+    function makeButton(label, className, onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = className;
+        button.textContent = label;
+        button.addEventListener("click", onClick);
+        return button;
+    }
+
+    function renderUsers() {
+        const query = searchInput.value.trim().toLowerCase();
+        const status = statusFilter.value;
+
+        const filtered = users.filter(user => {
+            const matchesEmail = user.email.toLowerCase().includes(query);
+            const matchesStatus = status === "all" ||
+                (status === "active" && user.isActive) ||
+                (status === "inactive" && !user.isActive);
+            return matchesEmail && matchesStatus;
+        });
+
+        tableBody.replaceChildren();
+        countLabel.textContent =
+            `${filtered.length} of ${users.length} user(s)`;
+
+        emptyState.hidden = filtered.length !== 0;
+
+        for (const user of filtered) {
+            const row = document.createElement("tr");
+
+            const emailCell = document.createElement("td");
+            const email = document.createElement("div");
+            email.className = "user-email";
+            email.textContent = user.email;
+            emailCell.appendChild(email);
+            row.appendChild(emailCell);
+
+            const roleCell = document.createElement("td");
+            const roleSelect = document.createElement("select");
+            roleSelect.className = "role-select";
+            roleSelect.setAttribute("aria-label", `Role for ${user.email}`);
+
+            for (const [value, label] of [
+                ["viewer", "Viewer"],
+                ["editor", "Editor"],
+                ["admin", "Admin"]
+            ]) {
+                const option = document.createElement("option");
+                option.value = value;
+                option.textContent = label;
+                option.selected = user.role === value;
+                roleSelect.appendChild(option);
+            }
+
+            roleSelect.disabled = !user.isActive;
+            roleSelect.addEventListener("change", async () => {
+                const newRole = roleSelect.value;
+                roleSelect.disabled = true;
+                clearMessage();
+
+                try {
+                    await api(`/api/users/${user.id}/role`, {
+                        method: "PATCH",
+                        body: JSON.stringify({role: newRole})
+                    });
+
+                    showMessage(`Role updated for ${user.email}.`, true);
+                    await loadUsers();
+                } catch (error) {
+                    showMessage(error.message);
+                    await loadUsers();
+                }
+            });
+
+            roleCell.appendChild(roleSelect);
+            row.appendChild(roleCell);
+
+            const statusCell = document.createElement("td");
+            const pill = document.createElement("span");
+            pill.className = "status-pill " +
+                (user.isActive ? "status-active" : "status-inactive");
+            pill.textContent = user.isActive ? "Active" : "Inactive";
+            statusCell.appendChild(pill);
+            row.appendChild(statusCell);
+
+            const createdCell = makeCell(
+                user.createdAt
+                    ? new Date(user.createdAt).toLocaleDateString()
+                    : "—"
+            );
+            row.appendChild(createdCell);
+
+            const actionsCell = document.createElement("td");
+            const actions = document.createElement("div");
+            actions.className = "row-actions";
+
+            const toggleButton = makeButton(
+                user.isActive ? "Deactivate" : "Activate",
+                "secondary-button small-button",
+                async () => {
+                    const action = user.isActive ? "deactivate" : "reactivate";
+
+                    if (!confirm(`${action} ${user.email}?`)) return;
+
+                    clearMessage();
+                    toggleButton.disabled = true;
+
+                    try {
+                        await api(`/api/users/${user.id}/status`, {
+                            method: "PATCH",
+                            body: JSON.stringify({
+                                isActive: !user.isActive
+                            })
+                        });
+
+                        showMessage(
+                            `${user.email} ${user.isActive ? "deactivated" : "activated"}.`,
+                            true
+                        );
+                        await loadUsers();
+                    } catch (error) {
+                        showMessage(error.message);
+                        await loadUsers();
+                    }
+                }
+            );
+
+            if (user.id === currentUserId) {
+                toggleButton.disabled = true;
+                toggleButton.title = "You cannot deactivate your own account.";
+            }
+
+            actions.appendChild(toggleButton);
+            actionsCell.appendChild(actions);
+            row.appendChild(actionsCell);
+
+            tableBody.appendChild(row);
+        }
+    }
+
+    async function loadUsers() {
+        tableBody.replaceChildren();
+        const loadingRow = document.createElement("tr");
+        const loadingCell = makeCell("Loading users...");
+        loadingCell.colSpan = 5;
+        loadingRow.appendChild(loadingCell);
+        tableBody.appendChild(loadingRow);
+
+        try {
+            users = await api("/api/users");
+            renderUsers();
+        } catch (error) {
+            tableBody.replaceChildren();
+            countLabel.textContent = "Could not load users";
+            emptyState.hidden = true;
+            showMessage(error.message);
+        }
+    }
+
+    document.getElementById("show-create-form").addEventListener("click", () => {
+        createPanel.hidden = !createPanel.hidden;
+        if (!createPanel.hidden) {
+            document.getElementById("new-email").focus();
+        }
+    });
+
+    document.getElementById("cancel-create").addEventListener("click", () => {
+        createForm.reset();
+        createPanel.hidden = true;
+        clearMessage();
+    });
+
+    createForm.addEventListener("submit", async event => {
+        event.preventDefault();
+        clearMessage();
+
+        const formData = new FormData(createForm);
+        const payload = {
+            email: formData.get("email"),
+            password: formData.get("password"),
+            role: formData.get("role")
+        };
+
+        createButton.disabled = true;
+        createButton.textContent = "Creating...";
+
+        try {
+            await api("/api/users", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
+
+            createForm.reset();
+            createPanel.hidden = true;
+            showMessage("User created successfully.", true);
+            await loadUsers();
+        } catch (error) {
+            showMessage(error.message);
+        } finally {
+            createButton.disabled = false;
+            createButton.textContent = "Create User";
+        }
+    });
+
+    searchInput.addEventListener("input", renderUsers);
+    statusFilter.addEventListener("change", renderUsers);
+
+    document.getElementById("refresh-users").addEventListener("click", () => {
+        clearMessage();
+        loadUsers();
+    });
+
+    async function initialise() {
+        try {
+            const response = await api("/api/login/status");
+            currentUserId = response.userId;
+        } catch (_) {
+            // The user list endpoint will display any authentication error.
+        }
+
+        await loadUsers();
+    }
+
+    initialise();
+})();
+</script>
+{% endblock %}

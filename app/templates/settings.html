@@ -1,0 +1,464 @@
+
+{% extends "base.html" %}
+
+{% block title %}Settings | AssetVault{% endblock %}
+{% block page_name %}Settings{% endblock %}
+
+{% block content %}
+<style>
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+
+    .settings-stat,
+    .settings-panel {
+        background: #fff;
+        border: 1px solid #e4e8f1;
+        border-radius: 14px;
+        padding: 22px;
+    }
+
+    .settings-stat-label {
+        color: #78849a;
+        font-size: 13px;
+    }
+
+    .settings-stat-value {
+        font-size: 25px;
+        font-weight: 700;
+        margin: 12px 0 5px;
+        color: #15213a;
+    }
+
+    .settings-stat-note {
+        color: #079568;
+        font-size: 12px;
+    }
+
+    .settings-panel {
+        margin-bottom: 22px;
+    }
+
+    .settings-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .settings-panel-header h2 {
+        margin: 0 0 6px;
+    }
+
+    .settings-muted {
+        color: #78849a;
+        font-size: 13px;
+    }
+
+    .settings-btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        background: #6654f5;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .settings-btn:disabled {
+        opacity: .6;
+        cursor: wait;
+    }
+
+    .settings-filter {
+        border: 1px solid #dce2ed;
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+        font: inherit;
+        max-width: 100%;
+    }
+
+    .settings-table-wrap {
+        overflow-x: auto;
+    }
+
+    .settings-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .settings-table th {
+        padding: 13px 10px;
+        border-bottom: 1px solid #e4e8f1;
+        color: #78849a;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        white-space: nowrap;
+    }
+
+    .settings-table td {
+        padding: 15px 10px;
+        border-bottom: 1px solid #edf0f6;
+        font-size: 13px;
+        vertical-align: top;
+    }
+
+    .settings-badge {
+        display: inline-block;
+        padding: 5px 8px;
+        border-radius: 20px;
+        background: #f0efff;
+        color: #5946e8;
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .settings-notice {
+        display: none;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+    }
+
+    .settings-notice.error {
+        display: block;
+        background: #fff0f0;
+        color: #b42318;
+    }
+
+    .settings-empty {
+        padding: 30px 12px;
+        text-align: center;
+        color: #78849a;
+    }
+
+    .settings-info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 0;
+        border-bottom: 1px solid #edf0f6;
+    }
+
+    .settings-info-row:last-child {
+        border-bottom: 0;
+    }
+
+    .settings-info-label {
+        color: #78849a;
+        font-size: 13px;
+    }
+
+    .settings-info-value {
+        font-size: 13px;
+        font-weight: 600;
+        text-align: right;
+        overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 760px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>Settings</h1>
+        <p class="page-description">
+            Workspace overview, security events, and administrative activity.
+        </p>
+    </div>
+</div>
+
+<div id="settings-error" class="settings-notice" role="alert"></div>
+
+<div class="settings-grid">
+    <div class="settings-stat">
+        <div class="settings-stat-label">Workspace</div>
+        <div class="settings-stat-value">AssetVault</div>
+        <div class="settings-stat-note">Workspace interface</div>
+    </div>
+
+    <div class="settings-stat">
+        <div class="settings-stat-label">Recent events loaded</div>
+        <div class="settings-stat-value" id="event-count">—</div>
+        <div class="settings-stat-note">Up to 100 latest audit records</div>
+    </div>
+
+    <div class="settings-stat">
+        <div class="settings-stat-label">Security events</div>
+        <div class="settings-stat-value" id="security-count">—</div>
+        <div class="settings-stat-note">API-key creation and revocation</div>
+    </div>
+</div>
+
+<div class="settings-panel">
+    <div class="settings-panel-header">
+        <div>
+            <h2>Workspace information</h2>
+            <p class="settings-muted">
+                Current session and access information.
+            </p>
+        </div>
+    </div>
+
+    <div class="settings-info-row">
+        <span class="settings-info-label">Application</span>
+        <span class="settings-info-value">AssetVault</span>
+    </div>
+
+    <div class="settings-info-row">
+        <span class="settings-info-label">Workspace status</span>
+        <span class="settings-info-value">Local development</span>
+    </div>
+
+    <div class="settings-info-row">
+        <span class="settings-info-label">Activity access</span>
+        <span class="settings-info-value">Admin only</span>
+    </div>
+
+    <p class="settings-muted" style="margin-top: 16px;">
+        Organization and member-management controls can be added when their
+        corresponding backend endpoints are implemented.
+    </p>
+</div>
+
+<div class="settings-panel">
+    <div class="settings-panel-header">
+        <div>
+            <h2>Recent activity</h2>
+            <p class="settings-muted">
+                Audit events recorded by AssetVault.
+            </p>
+        </div>
+
+        <button id="refresh-audit" class="settings-btn" type="button">
+            Refresh activity
+        </button>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;">
+        <input
+            id="audit-search"
+            class="settings-filter"
+            type="search"
+            placeholder="Search actions or users..."
+            aria-label="Search audit activity"
+        >
+
+        <select id="audit-filter" class="settings-filter"
+                aria-label="Filter audit activity">
+            <option value="all">All activity</option>
+            <option value="security">Security events</option>
+            <option value="website">Website events</option>
+        </select>
+    </div>
+
+    <div class="settings-table-wrap">
+        <table class="settings-table">
+            <thead>
+                <tr>
+                    <th>Action</th>
+                    <th>Actor</th>
+                    <th>Entity ID</th>
+                    <th>Details</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table-body">
+                <tr>
+                    <td colspan="5" class="settings-empty">
+                        Loading activity...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(() => {
+    const tableBody = document.getElementById("audit-table-body");
+    const refreshButton = document.getElementById("refresh-audit");
+    const errorBox = document.getElementById("settings-error");
+    const searchInput = document.getElementById("audit-search");
+    const filterSelect = document.getElementById("audit-filter");
+
+    let auditEvents = [];
+
+    function showError(message) {
+        errorBox.textContent = message;
+        errorBox.className = "settings-notice error";
+    }
+
+    function clearError() {
+        errorBox.textContent = "";
+        errorBox.className = "settings-notice";
+    }
+
+    function isSecurityEvent(action) {
+        return action.startsWith("apikey.");
+    }
+
+    function matchesFilter(event) {
+        const filter = filterSelect.value;
+
+        if (filter === "security") {
+            return isSecurityEvent(event.action);
+        }
+
+        if (filter === "website") {
+            return event.action.startsWith("website.");
+        }
+
+        return true;
+    }
+
+    function renderAudit() {
+        const query = searchInput.value.trim().toLowerCase();
+
+        const filtered = auditEvents.filter(event => {
+            const searchable = [
+                event.action,
+                event.actor,
+                event.entityId,
+                JSON.stringify(event.details ?? "")
+            ].join(" ").toLowerCase();
+
+            return matchesFilter(event) && searchable.includes(query);
+        });
+
+        document.getElementById("event-count").textContent =
+            auditEvents.length;
+
+        document.getElementById("security-count").textContent =
+            auditEvents.filter(event =>
+                isSecurityEvent(event.action)
+            ).length;
+
+        tableBody.replaceChildren();
+
+        if (!filtered.length) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+
+            cell.colSpan = 5;
+            cell.className = "settings-empty";
+            cell.textContent = auditEvents.length
+                ? "No events match your filters."
+                : "No audit events have been recorded yet.";
+
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+            return;
+        }
+
+        filtered.forEach(event => {
+            const row = document.createElement("tr");
+
+            const actionCell = document.createElement("td");
+            const badge = document.createElement("span");
+            badge.className = "settings-badge";
+            badge.textContent = event.action || "Unknown action";
+            actionCell.appendChild(badge);
+
+            const actorCell = document.createElement("td");
+            actorCell.textContent = event.actor || "—";
+
+            const entityCell = document.createElement("td");
+            entityCell.textContent = event.entityId ?? "—";
+
+            const detailsCell = document.createElement("td");
+            detailsCell.textContent = event.details == null
+                ? "—"
+                : JSON.stringify(event.details);
+
+            const dateCell = document.createElement("td");
+            dateCell.textContent = event.createdAt
+                ? new Date(event.createdAt).toLocaleString()
+                : "—";
+
+            row.append(
+                actionCell,
+                actorCell,
+                entityCell,
+                detailsCell,
+                dateCell
+            );
+
+            tableBody.appendChild(row);
+        });
+    }
+
+    async function loadAudit() {
+        refreshButton.disabled = true;
+        refreshButton.textContent = "Loading...";
+        clearError();
+
+        try {
+            const response = await fetch("/api/audit", {
+                method: "GET",
+                credentials: "same-origin",
+                headers: { "Accept": "application/json" }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error(
+                        "Audit activity requires an authenticated admin account."
+                    );
+                }
+
+                throw new Error(
+                    `Could not load audit activity (HTTP ${response.status}).`
+                );
+            }
+
+            const data = await response.json();
+
+            if (!Array.isArray(data)) {
+                throw new Error("The audit endpoint returned unexpected data.");
+            }
+
+            auditEvents = data;
+            renderAudit();
+        } catch (error) {
+            tableBody.replaceChildren();
+
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 5;
+            cell.className = "settings-empty";
+            cell.textContent = "Unable to load audit activity.";
+
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+
+            showError(error.message || "An unexpected error occurred.");
+        } finally {
+            refreshButton.disabled = false;
+            refreshButton.textContent = "Refresh activity";
+        }
+    }
+
+    refreshButton.addEventListener("click", loadAudit);
+    searchInput.addEventListener("input", renderAudit);
+    filterSelect.addEventListener("change", renderAudit);
+
+    loadAudit();
+})();
+</script>
+{% endblock %}
