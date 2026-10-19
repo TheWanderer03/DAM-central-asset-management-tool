@@ -49,6 +49,7 @@ def login():
     ):
         return jsonify(error="bad_credentials"), 401
 
+    # Clear any previous session before establishing a new login.
     session.clear()
     session["user_id"] = user.id
 
@@ -65,14 +66,26 @@ def logout():
     return jsonify(ok=True)
 
 
-# User management page
+# Return the currently authenticated user's information.
+@bp.get("/api/login/status")
+@require_role("viewer")
+def login_status():
+    return jsonify(
+        userId=g.user.id,
+        email=g.user.email,
+        role=g.user.role,
+        orgId=g.user.org_id,
+    )
+
+
+# Render the User Management page.
 @bp.get("/users")
 @require_role("admin")
 def users_page():
     return render_template("users.html")
 
 
-# List users in the current organization
+# List users belonging to the current organization.
 @bp.get("/api/users")
 @require_role("admin")
 def list_users():
@@ -98,7 +111,7 @@ def list_users():
     ])
 
 
-# Create a user
+# Create a user in the current organization.
 @bp.post("/api/users")
 @require_role("admin")
 def create_user():
@@ -108,7 +121,12 @@ def create_user():
     password = data.get("password", "")
     role = str(data.get("role", "viewer")).strip().lower()
 
-    if not email or len(email) > 254 or "@" not in email:
+    if (
+        not email
+        or len(email) > 254
+        or "@" not in email
+        or any(char.isspace() for char in email)
+    ):
         return jsonify(
             error="validation_error",
             message="Enter a valid email address.",
@@ -144,17 +162,22 @@ def create_user():
         is_active=True,
     )
 
-    db.session.add(user)
-    db.session.flush()
+    try:
+        db.session.add(user)
+        db.session.flush()
 
-    audit(
-        g.user.org_id,
-        f"user:{g.user.id}",
-        "user.created",
-        user.id,
-    )
+        audit(
+            g.user.org_id,
+            f"user:{g.user.id}",
+            "user.created",
+            user.id,
+        )
 
-    db.session.commit()
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+        raise
 
     return jsonify(
         message="User created successfully.",
@@ -167,7 +190,7 @@ def create_user():
     ), 201
 
 
-# Change a user's role
+# Change a user's role.
 @bp.patch("/api/users/<int:user_id>/role")
 @require_role("admin")
 def change_user_role(user_id):
@@ -200,19 +223,28 @@ def change_user_role(user_id):
             message="You cannot remove your own admin role.",
         ), 400
 
+    if user.role == role:
+        return jsonify(message="User role is unchanged.")
+
+    previous_role = user.role
     user.role = role
 
-    audit(
-        g.user.org_id,
-        f"user:{g.user.id}",
-        "user.role_changed",
-        user.id,
-    )
+    try:
+        audit(
+            g.user.org_id,
+            f"user:{g.user.id}",
+            "user.role_changed",
+            user.id,
+        )
 
-    db.session.commit()
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+        raise
 
     return jsonify(
-        message="User role updated.",
+        message=f"User role changed from {previous_role} to {role}.",
         user={
             "id": user.id,
             "email": user.email,
@@ -222,7 +254,7 @@ def change_user_role(user_id):
     )
 
 
-# Deactivate or reactivate an account
+# Activate or deactivate a user account.
 @bp.patch("/api/users/<int:user_id>/status")
 @require_role("admin")
 def change_user_status(user_id):
@@ -252,6 +284,7 @@ def change_user_status(user_id):
     if user.is_active == is_active:
         return jsonify(message="Account status is unchanged.")
 
+    # Prevent deactivating the last active admin in the organization.
     if not is_active and user.role == "admin":
         other_admins = User.query.filter(
             User.org_id == g.user.org_id,
@@ -268,18 +301,26 @@ def change_user_status(user_id):
 
     user.is_active = is_active
 
-    audit(
-        g.user.org_id,
-        f"user:{g.user.id}",
-        "user.activated" if is_active else "user.deactivated",
-        user.id,
-    )
+    try:
+        audit(
+            g.user.org_id,
+            f"user:{g.user.id}",
+            "user.activated" if is_active else "user.deactivated",
+            user.id,
+        )
 
-    db.session.commit()
+        db.session.commit()
+
+    except Exception:
+        db.session.rollback()
+        raise
 
     return jsonify(
-        message="Account activated." if is_active
-        else "Account deactivated.",
+        message=(
+            "Account activated."
+            if is_active
+            else "Account deactivated."
+        ),
         user={
             "id": user.id,
             "email": user.email,
