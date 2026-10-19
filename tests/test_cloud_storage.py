@@ -64,3 +64,32 @@ def test_inspect_s3_object_info_reads_actual_s3_metadata(monkeypatch):
             "mimeType": "image/png",
             "sizeBytes": 2048,
         }
+
+
+def test_s3_client_uses_minio_settings_and_path_style(monkeypatch):
+    captured = {}
+
+    def fake_client(service_name, **kwargs):
+        captured["service_name"] = service_name
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr("app.storage.boto3.client", fake_client)
+    app = make_app()
+    app.config.update(
+        S3_ENDPOINT_URL="http://localhost:9000",
+        S3_ACCESS_KEY_ID="dam-minio",
+        S3_SECRET_ACCESS_KEY="local-secret",
+        S3_REGION="us-east-1",
+    )
+    with app.app_context():
+        from app.storage import get_s3_client
+
+        get_s3_client()
+
+    assert captured["service_name"] == "s3"
+    assert captured["endpoint_url"] == "http://localhost:9000"
+    assert captured["aws_access_key_id"] == "dam-minio"
+    assert captured["aws_secret_access_key"] == "local-secret"
+    assert captured["region_name"] == "us-east-1"
+    assert captured["config"].s3["addressing_style"] == "path"

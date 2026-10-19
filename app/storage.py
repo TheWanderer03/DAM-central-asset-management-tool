@@ -2,6 +2,7 @@ import os
 import uuid
 
 import boto3
+from botocore.config import Config
 from flask import current_app
 
 
@@ -19,14 +20,31 @@ def get_s3_client():
         return None
 
     client_kwargs = {
-        "region_name": current_app.config.get("AWS_REGION") or None,
+        "region_name": current_app.config.get("S3_REGION")
+        or current_app.config.get("AWS_DEFAULT_REGION")
+        or current_app.config.get("AWS_REGION")
+        or None,
     }
-    endpoint_url = (current_app.config.get("AWS_S3_ENDPOINT_URL") or "").strip()
+
+    endpoint_url = (
+        current_app.config.get("S3_ENDPOINT_URL")
+        or current_app.config.get("AWS_S3_ENDPOINT_URL")
+        or ""
+    ).strip()
     if endpoint_url:
         client_kwargs["endpoint_url"] = endpoint_url
+        client_kwargs["config"] = Config(s3={"addressing_style": "path"})
 
-    access_key = (current_app.config.get("AWS_ACCESS_KEY_ID") or "").strip()
-    secret_key = (current_app.config.get("AWS_SECRET_ACCESS_KEY") or "").strip()
+    access_key = (
+        current_app.config.get("S3_ACCESS_KEY_ID")
+        or current_app.config.get("AWS_ACCESS_KEY_ID")
+        or ""
+    ).strip()
+    secret_key = (
+        current_app.config.get("S3_SECRET_ACCESS_KEY")
+        or current_app.config.get("AWS_SECRET_ACCESS_KEY")
+        or ""
+    ).strip()
     if access_key:
         client_kwargs["aws_access_key_id"] = access_key
     if secret_key:
