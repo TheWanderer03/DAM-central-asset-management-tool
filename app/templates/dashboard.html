@@ -1,0 +1,174 @@
+
+{% extends "base.html" %}
+
+{% block title %}Dashboard | AssetVault{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="page-heading">
+    <div>
+        <h1>Dashboard</h1>
+        <p>Manage and track your digital assets in one place.</p>
+    </div>
+
+    <button class="primary-button"
+            onclick="alert('Upload feature coming soon!')">
+        + Upload Asset
+    </button>
+</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-label">Total Assets</div>
+        <div class="stat-value" id="total-assets">--</div>
+        <div class="stat-note">Assets in your workspace</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">Asset Types</div>
+        <div class="stat-value" id="asset-types">--</div>
+        <div class="stat-note">Different formats stored</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-label">Workspace Status</div>
+        <div class="stat-value" style="font-size: 24px;">
+            Active
+        </div>
+        <div class="stat-note">Your workspace is ready</div>
+    </div>
+
+</div>
+
+<div class="panel">
+
+    <div class="panel-heading">
+        <h2>Recent Assets</h2>
+        <span>Workspace overview</span>
+    </div>
+
+    <table class="asset-table">
+        <thead>
+            <tr>
+                <th>Asset</th>
+                <th>Type</th>
+                <th>Tags</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody id="asset-list">
+            <tr>
+                <td colspan="4">Loading assets...</td>
+            </tr>
+        </tbody>
+    </table>
+
+</div>
+
+<script>
+    async function loadDashboard() {
+        const totalAssets = document.getElementById("total-assets");
+        const assetTypes = document.getElementById("asset-types");
+        const assetList = document.getElementById("asset-list");
+
+        try {
+            const response = await fetch("/api/assets", {
+                method: "GET",
+                credentials: "same-origin"
+            });
+
+            if (response.status === 401 || response.status === 403) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error("Could not load assets.");
+            }
+
+            const assets = await response.json();
+
+            // Update the statistics.
+            totalAssets.textContent = assets.length;
+
+            const types = new Set(
+                assets
+                    .map(asset => asset.type)
+                    .filter(type => type)
+            );
+
+            assetTypes.textContent = types.size;
+
+            // Remove the loading or placeholder row.
+            assetList.replaceChildren();
+
+            // Show a message if the workspace has no assets.
+            if (assets.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+
+                cell.colSpan = 4;
+                cell.textContent =
+                    "No assets found in your workspace yet.";
+
+                row.appendChild(cell);
+                assetList.appendChild(row);
+                return;
+            }
+
+            // Display the five most recent assets.
+            assets.slice(0, 5).forEach(asset => {
+                const row = document.createElement("tr");
+
+                const nameCell = document.createElement("td");
+                nameCell.textContent = asset.name || "Untitled";
+
+                const typeCell = document.createElement("td");
+                typeCell.textContent = asset.type || "Unknown";
+
+                const tagsCell = document.createElement("td");
+                tagsCell.textContent = Array.isArray(asset.tags)
+                    ? asset.tags.join(", ")
+                    : "";
+
+                const statusCell = document.createElement("td");
+                statusCell.textContent = "Available";
+
+                row.append(
+                    nameCell,
+                    typeCell,
+                    tagsCell,
+                    statusCell
+                );
+
+                assetList.appendChild(row);
+            });
+
+        } catch (error) {
+            console.error("Dashboard error:", error);
+
+            totalAssets.textContent = "—";
+            assetTypes.textContent = "—";
+
+            assetList.replaceChildren();
+
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+
+            cell.colSpan = 4;
+            cell.textContent =
+                "Could not load assets. Please refresh the page and try again.";
+
+            row.appendChild(cell);
+            assetList.appendChild(row);
+        }
+    }
+
+    loadDashboard();
+</script>
+
+{% endblock %}
+

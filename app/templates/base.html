@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AssetVault{% endblock %}</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/dashboard.css') }}"
+    >
+</head>
+<body>
+
+    <div class="app-layout">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">A</div>
+                <span>AssetVault</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <p class="nav-heading">WORKSPACE</p>
+
+                <a
+                    href="{{ url_for('dashboard.dashboard_page') }}"
+                    class="nav-link {% if request.endpoint == 'dashboard.dashboard_page' %}active{% endif %}"
+                >
+                    <span class="nav-icon">⌂</span>
+                    <span>Dashboard</span>
+                </a>
+
+                <a
+                    href="{{ url_for('dashboard.assets_page') }}"
+                    class="nav-link {% if request.endpoint == 'dashboard.assets_page' %}active{% endif %}"
+                >
+                    <span class="nav-icon">▤</span>
+                    <span>Assets</span>
+                </a>
+
+                <a
+                    href="{{ url_for('dashboard.upload_page') }}"
+                    class="nav-link {% if request.endpoint == 'dashboard.upload_page' %}active{% endif %}"
+                >
+                    <span class="nav-icon">↑</span>
+                    <span>Upload Assets</span>
+                </a>
+
+                <p class="nav-heading">MANAGEMENT</p>
+
+                <a href="#" class="nav-link">
+                    <span class="nav-icon">◎</span>
+                    <span>Websites</span>
+                </a>
+
+                <a href="#" class="nav-link">
+                    <span class="nav-icon">⚙</span>
+                    <span>Settings</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-avatar">U</div>
+                <div class="user-info">
+                    <strong>Workspace User</strong>
+                    <span>AssetVault Workspace</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-area">
+
+            <header class="topbar">
+                <div class="breadcrumb">
+                    <span>Workspace</span>
+                    <span class="breadcrumb-separator">/</span>
+                    <span class="breadcrumb-current">
+                        {% block page_name %}Dashboard{% endblock %}
+                    </span>
+                </div>
+
+                <div class="topbar-actions">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Workspace Active</span>
+                </div>
+            </header>
+
+            <section class="page-content">
+                {% block content %}{% endblock %}
+            </section>
+
+        </main>
+
+    </div>
+
+</body>
+</html>

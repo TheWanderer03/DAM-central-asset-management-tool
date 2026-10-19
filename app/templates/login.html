@@ -1,0 +1,227 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | AssetVault</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/dashboard.css') }}">
+    
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            background: #f5f6fb;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            padding: 40px;
+            border-radius: 18px;
+            border: 1px solid #e8eaf2;
+            box-shadow: 0 12px 40px rgba(30, 35, 90, 0.06);
+        }
+
+        .login-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            font-size: 23px;
+            font-weight: 750;
+            color: #111827;
+        }
+
+        .login-logo {
+            width: 42px;
+            height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: #6655ee;
+            color: white;
+            font-size: 23px;
+        }
+
+        .login-card h1 {
+            margin-bottom: 8px;
+            font-size: 28px;
+            color: #111827;
+        }
+
+        .login-subtitle {
+            margin-bottom: 28px;
+            color: #7b8498;
+            font-size: 14px;
+        }
+
+        .login-field {
+            margin-bottom: 20px;
+        }
+
+        .login-field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .login-field input {
+            width: 100%;
+            padding: 13px 14px;
+            border: 1px solid #dfe3ed;
+            border-radius: 9px;
+            font-size: 14px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .login-field input:focus {
+            border-color: #6655ee;
+            box-shadow: 0 0 0 3px rgba(102, 85, 238, 0.12);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 8px;
+            border: none;
+            border-radius: 9px;
+            background: #6655ee;
+            color: white;
+            font-size: 15px;
+            font-weight: 650;
+            cursor: pointer;
+        }
+
+        .login-button:hover {
+            background: #5543dc;
+        }
+
+        .login-error {
+            margin-bottom: 18px;
+            padding: 12px;
+            border-radius: 8px;
+            background: #fff0f0;
+            color: #c62828;
+            font-size: 13px;
+        }
+
+        .login-footer {
+            margin-top: 24px;
+            text-align: center;
+            color: #8b93a5;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="login-page">
+        <section class="login-card">
+
+            <div class="login-brand">
+                <div class="login-logo">V</div>
+                <span>AssetVault</span>
+            </div>
+
+            <h1>Welcome back</h1>
+            <p class="login-subtitle">
+                Sign in to manage your digital assets.
+            </p>
+
+            {% if error %}
+                <div class="login-error">{{ error }}</div>
+            {% endif %}
+
+            <form id="loginForm">
+                <div class="login-field">
+                    <label for="email">Email address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        placeholder="you@company.com"
+                        required
+                    >
+                </div>
+
+                <div class="login-field">
+                    <label for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
+
+                <p id="errorMessage" class="login-error" hidden></p>
+
+                <button type="submit" class="login-button">
+                    Sign In
+                </button>
+            </form>
+
+            <p class="login-footer">
+                Secure workspace · AssetVault
+            </p>
+
+        </section>
+    </main>
+
+    <script>
+        const loginForm = document.getElementById("loginForm");
+        const errorMessage = document.getElementById("errorMessage");
+
+        loginForm.addEventListener("submit", async function (event) {
+            event.preventDefault();
+
+            const button = loginForm.querySelector("button");
+            button.disabled = true;
+            button.textContent = "Signing in...";
+            errorMessage.hidden = true;
+
+            try {
+                const response = await fetch("/api/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                        email: document.getElementById("email").value,
+                        password: document.getElementById("password").value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        result.error || result.message || "Login failed. Check your details."
+                    );
+                }
+
+                window.location.href = "/";
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
+            } finally {
+                button.disabled = false;
+                button.textContent = "Sign In";
+            }
+        });
+    </script>
+</body>
+</html>

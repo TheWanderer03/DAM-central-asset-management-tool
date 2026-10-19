@@ -1,0 +1,121 @@
+
+{% extends "base.html" %}
+
+{% block title %}Upload Assets | AssetVault{% endblock %}
+{% block page_name %}Upload Assets{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Upload Assets</h1>
+        <p>Add images, videos, and documents to your asset library.</p>
+    </div>
+
+    <a href="{{ url_for('dashboard.assets_page') }}" class="btn btn-secondary">
+        Back to Assets
+    </a>
+</div>
+
+<div class="card upload-card">
+    <form id="upload-form">
+
+        <div class="upload-area" id="upload-area">
+            <div class="upload-icon">↑</div>
+
+            <h3>Choose a file to upload</h3>
+            <p>Select an image, video, or document from your device.</p>
+
+            <input
+                type="file"
+                id="asset-file"
+                name="file"
+                accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.txt"
+                required
+            >
+
+            <p id="selected-file" aria-live="polite">No file selected</p>
+        </div>
+
+        <div class="form-group">
+            <label for="asset-name">Asset Name</label>
+            <input
+                type="text"
+                id="asset-name"
+                name="name"
+                placeholder="Enter an asset name"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="asset-tags">Tags</label>
+            <input
+                type="text"
+                id="asset-tags"
+                name="tags"
+                placeholder="e.g. logo, marketing, website"
+            >
+            <small>Separate multiple tags with commas.</small>
+        </div>
+
+        <div id="upload-message" role="status" aria-live="polite"></div>
+
+        <button type="submit" class="btn btn-primary" id="upload-button">
+            Upload Asset
+        </button>
+
+    </form>
+</div>
+
+<script>
+    const fileInput = document.getElementById("asset-file");
+    const nameInput = document.getElementById("asset-name");
+    const selectedFile = document.getElementById("selected-file");
+    const uploadForm = document.getElementById("upload-form");
+    const uploadMessage = document.getElementById("upload-message");
+
+    fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+
+        if (!file) {
+            selectedFile.textContent = "No file selected";
+            return;
+        }
+
+        selectedFile.textContent =
+            file.name + " (" + formatFileSize(file.size) + ")";
+
+        if (!nameInput.value.trim()) {
+            nameInput.value = file.name.replace(/\.[^/.]+$/, "");
+        }
+
+        uploadMessage.textContent = "";
+    });
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+
+        if (bytes < 1024 * 1024) {
+            return (bytes / 1024).toFixed(1) + " KB";
+        }
+
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    uploadForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        if (!fileInput.files.length) {
+            uploadMessage.textContent = "Please choose a file first.";
+            return;
+        }
+
+        uploadMessage.textContent =
+            "The upload interface is ready, but the backend upload endpoint has not been connected yet.";
+    });
+</script>
+
+{% endblock %}
