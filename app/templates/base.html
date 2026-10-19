@@ -15,7 +15,6 @@
 
     <div class="app-layout">
 
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-brand">
                 <div class="brand-icon">A</div>
@@ -51,12 +50,18 @@
 
                 <p class="nav-heading">MANAGEMENT</p>
 
-                <a href="#" class="nav-link">
+                <a
+                    href="{{ url_for('dashboard.websites_page') }}"
+                    class="nav-link {% if request.endpoint == 'dashboard.websites_page' %}active{% endif %}"
+                >
                     <span class="nav-icon">◎</span>
                     <span>Websites</span>
                 </a>
 
-                <a href="#" class="nav-link">
+                <a
+                    href="{{ url_for('dashboard.settings_page') }}"
+                    class="nav-link {% if request.endpoint == 'dashboard.settings_page' %}active{% endif %}"
+                >
                     <span class="nav-icon">⚙</span>
                     <span>Settings</span>
                 </a>
@@ -71,7 +76,6 @@
             </div>
         </aside>
 
-        <!-- Main content -->
         <main class="main-area">
 
             <header class="topbar">

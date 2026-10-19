@@ -36,6 +36,18 @@ def asset_detail_page(asset_id):
     return render_template("asset_detail.html")
 
 
+# Websites management page
+@bp.get("/websites")
+def websites_page():
+    return render_template("websites.html")
+
+
+# Workspace settings page
+@bp.get("/settings")
+def settings_page():
+    return render_template("settings.html")
+
+
 # Convert an asset model into JSON
 def asset_dict(a):
     return dict(
