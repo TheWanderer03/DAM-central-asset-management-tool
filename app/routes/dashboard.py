@@ -1,9 +1,17 @@
 import secrets
+from botocore.exceptions import ClientError
 from flask import Blueprint, request, jsonify, g
 from ..extensions import db
 from ..models import Asset, AssetVersion, AssetUsage, Website, ApiKey, AuditLog
 from ..security import require_role, hash_key
 from ..audit import audit
+from ..storage import (
+    asset_url_for,
+    build_storage_key,
+    generate_presigned_upload_url,
+    inspect_s3_object_info,
+    is_cloud_storage_enabled,
+)
 
 bp = Blueprint("dashboard", __name__)
 
@@ -38,6 +46,130 @@ def get_asset(asset_id):
                        mimeType=v.mime_type, sizeBytes=v.size_bytes,
                        createdAt=v.created_at) for v in versions],
         usages=[dict(website=u[0], pageUrl=u[1], lastSeen=u[2]) for u in usages],
+    )
+
+@bp.post("/api/assets/presign-upload")
+@require_role("editor")
+def presign_upload():
+    if not is_cloud_storage_enabled():
+        return jsonify(error="cloud storage not configured"), 503
+
+    data = request.get_json() or {}
+    asset_id = data.get("assetId")
+    if not isinstance(asset_id, int) or isinstance(asset_id, bool):
+        return jsonify(error="assetId must be an integer"), 400
+    asset = Asset.query.filter_by(
+        id=asset_id,
+        org_id=g.user.org_id,
+        deleted=False,
+    ).first()
+    if not asset:
+        return jsonify(error="not_found"), 404
+
+    filename = data.get("filename") or "upload.bin"
+    content_type = data.get("contentType") or "application/octet-stream"
+    if not isinstance(filename, str) or not isinstance(content_type, str):
+        return jsonify(error="filename and contentType must be strings"), 400
+
+    storage_key = build_storage_key(asset.id, filename)
+    upload_url = generate_presigned_upload_url(storage_key, content_type)
+    if not upload_url:
+        return jsonify(error="cloud storage not configured"), 503
+    return jsonify(
+        uploadUrl=upload_url,
+        storageKey=storage_key,
+        contentType=content_type,
+        assetUrl=asset_url_for(storage_key),
+    )
+
+@bp.post("/api/assets/<int:asset_id>/confirm-upload")
+@require_role("editor")
+def confirm_upload(asset_id):
+    asset = Asset.query.filter_by(
+        id=asset_id,
+        org_id=g.user.org_id,
+        deleted=False,
+    ).first()
+    if not asset:
+        return jsonify(error="not_found"), 404
+
+    data = request.get_json() or {}
+    storage_key = data.get("storageKey")
+    if not isinstance(storage_key, str) or not storage_key:
+        return jsonify(error="storageKey required"), 400
+    if not storage_key.startswith(f"assets/{asset.id}/"):
+        return jsonify(error="storageKey does not belong to this asset"), 400
+
+    try:
+        info = inspect_s3_object_info(storage_key)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+            return jsonify(error="uploaded object not found"), 404
+        raise
+    if info is None:
+        return jsonify(error="cloud storage not configured"), 503
+    return jsonify(assetId=asset.id, storageKey=storage_key, info=info)
+
+@bp.post("/api/assets/<int:asset_id>/replace-version")
+@require_role("editor")
+def replace_version(asset_id):
+    asset = Asset.query.filter_by(
+        id=asset_id,
+        org_id=g.user.org_id,
+        deleted=False,
+    ).first()
+    if not asset:
+        return jsonify(error="not_found"), 404
+
+    data = request.get_json() or {}
+    storage_key = data.get("storageKey")
+    if not isinstance(storage_key, str) or not storage_key:
+        return jsonify(error="storageKey required"), 400
+    if not storage_key.startswith(f"assets/{asset.id}/"):
+        return jsonify(error="storageKey does not belong to this asset"), 400
+
+    try:
+        info = inspect_s3_object_info(storage_key)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+            return jsonify(error="uploaded object not found"), 404
+        raise
+    if info is None:
+        return jsonify(error="cloud storage not configured"), 503
+
+    latest_version = (
+        AssetVersion.query.filter_by(asset_id=asset.id)
+        .order_by(AssetVersion.version_number.desc())
+        .first()
+    )
+    next_number = (latest_version.version_number if latest_version else 0) + 1
+    version = AssetVersion(
+        asset_id=asset.id,
+        version_number=next_number,
+        storage_key=storage_key,
+        mime_type=info["mimeType"],
+        size_bytes=info["sizeBytes"],
+    )
+    db.session.add(version)
+    db.session.flush()
+    asset.current_version_id = version.id
+    db.session.add(
+        AuditLog(
+            org_id=g.user.org_id,
+            actor=f"user:{g.user.id}",
+            action="asset.replaced",
+            entity_id=str(asset.id),
+            details={"version": next_number, "storageKey": storage_key},
+        )
+    )
+    db.session.commit()
+    return jsonify(
+        ok=True,
+        assetId=asset.id,
+        version=next_number,
+        url=asset_url_for(storage_key),
+        mimeType=info["mimeType"],
+        sizeBytes=info["sizeBytes"],
     )
 
 @bp.post("/api/websites/<int:website_id>/keys")
