@@ -12,13 +12,14 @@
         <p>Add images, videos, and documents to your asset library.</p>
     </div>
 
-    <a href="{{ url_for('dashboard.assets_page') }}" class="btn btn-secondary">
+    <a href="{{ url_for('dashboard.assets_page') }}"
+       class="btn btn-secondary">
         Back to Assets
     </a>
 </div>
 
 <div class="card upload-card">
-    <form id="upload-form">
+    <form id="upload-form" enctype="multipart/form-data">
 
         <div class="upload-area" id="upload-area">
             <div class="upload-icon">↑</div>
@@ -30,11 +31,13 @@
                 type="file"
                 id="asset-file"
                 name="file"
-                accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.txt"
+                accept="image/*,video/mp4,video/webm,video/quicktime,.pdf,.doc,.docx,.ppt,.pptx,.txt"
                 required
             >
 
-            <p id="selected-file" aria-live="polite">No file selected</p>
+            <p id="selected-file" aria-live="polite">
+                No file selected
+            </p>
         </div>
 
         <div class="form-group">
@@ -44,6 +47,7 @@
                 id="asset-name"
                 name="name"
                 placeholder="Enter an asset name"
+                maxlength="200"
                 required
             >
         </div>
@@ -61,7 +65,9 @@
 
         <div id="upload-message" role="status" aria-live="polite"></div>
 
-        <button type="submit" class="btn btn-primary" id="upload-button">
+        <button type="submit"
+                class="btn btn-primary"
+                id="upload-button">
             Upload Asset
         </button>
 
@@ -74,9 +80,12 @@
     const selectedFile = document.getElementById("selected-file");
     const uploadForm = document.getElementById("upload-form");
     const uploadMessage = document.getElementById("upload-message");
+    const uploadButton = document.getElementById("upload-button");
 
     fileInput.addEventListener("change", function () {
         const file = fileInput.files[0];
+
+        uploadMessage.textContent = "";
 
         if (!file) {
             selectedFile.textContent = "No file selected";
@@ -89,8 +98,6 @@
         if (!nameInput.value.trim()) {
             nameInput.value = file.name.replace(/\.[^/.]+$/, "");
         }
-
-        uploadMessage.textContent = "";
     });
 
     function formatFileSize(bytes) {
@@ -105,7 +112,7 @@
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     }
 
-    uploadForm.addEventListener("submit", function (event) {
+    uploadForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         if (!fileInput.files.length) {
@@ -113,8 +120,47 @@
             return;
         }
 
-        uploadMessage.textContent =
-            "The upload interface is ready, but the backend upload endpoint has not been connected yet.";
+        if (!nameInput.value.trim()) {
+            uploadMessage.textContent = "Please enter an asset name.";
+            return;
+        }
+
+        const formData = new FormData(uploadForm);
+
+        uploadButton.disabled = true;
+        uploadButton.textContent = "Uploading...";
+        uploadMessage.textContent = "Uploading your asset...";
+
+        try {
+            const response = await fetch("/api/assets/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.message || result.error || "Upload failed."
+                );
+            }
+
+            uploadMessage.textContent =
+                "Upload successful! Asset ID: " + result.asset.id;
+
+            uploadForm.reset();
+            selectedFile.textContent = "No file selected";
+
+            setTimeout(function () {
+                window.location.href = "/assets";
+            }, 1000);
+
+        } catch (error) {
+            uploadMessage.textContent = error.message;
+        } finally {
+            uploadButton.disabled = false;
+            uploadButton.textContent = "Upload Asset";
+        }
     });
 </script>
 
