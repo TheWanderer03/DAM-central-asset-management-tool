@@ -1,0 +1,263 @@
+
+{% extends "base.html" %}
+
+{% block title %}Asset Details | AssetVault{% endblock %}
+{% block breadcrumb %}Assets / Details{% endblock %}
+
+{% block content %}
+
+<div class="page-heading">
+    <div>
+        <h1 id="asset-name">Asset Details</h1>
+        <p>View asset information, version history, and website usage.</p>
+    </div>
+
+    <a href="/assets" class="primary-button"
+       style="text-decoration: none; display: inline-block;">
+        Back to Assets
+    </a>
+</div>
+
+<div id="page-message" class="panel" style="padding: 24px;">
+    Loading asset details...
+</div>
+
+<div id="asset-content" hidden>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Asset Type</div>
+            <div class="stat-value" id="asset-type">—</div>
+            <div class="stat-note">File format category</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Asset ID</div>
+            <div class="stat-value" id="asset-id">—</div>
+            <div class="stat-note">Internal identifier</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Versions</div>
+            <div class="stat-value" id="version-count">0</div>
+            <div class="stat-note">Recorded asset versions</div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 24px;">
+        <div class="panel-heading">
+            <h2>Asset Information</h2>
+        </div>
+
+        <div style="padding: 20px;">
+            <p><strong>Name:</strong> <span id="detail-name"></span></p>
+            <p><strong>Public ID:</strong> <span id="public-id"></span></p>
+            <p><strong>Tags:</strong> <span id="asset-tags"></span></p>
+            <p><strong>Current Version ID:</strong>
+                <span id="current-version"></span>
+            </p>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 24px;">
+        <div class="panel-heading">
+            <h2>Version History</h2>
+            <span id="version-label">All versions</span>
+        </div>
+
+        <table class="asset-table">
+            <thead>
+                <tr>
+                    <th>Version</th>
+                    <th>File Type</th>
+                    <th>Size</th>
+                    <th>Storage Key</th>
+                </tr>
+            </thead>
+
+            <tbody id="version-list">
+                <tr>
+                    <td colspan="4">Loading versions...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel" style="margin-top: 24px;">
+        <div class="panel-heading">
+            <h2>Website Usage</h2>
+            <span>Where this asset is used</span>
+        </div>
+
+        <table class="asset-table">
+            <thead>
+                <tr>
+                    <th>Website</th>
+                    <th>Page URL</th>
+                    <th>Last Seen</th>
+                </tr>
+            </thead>
+
+            <tbody id="usage-list">
+                <tr>
+                    <td colspan="3">Loading website usage...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const pageMessage = document.getElementById("page-message");
+    const assetContent = document.getElementById("asset-content");
+
+    function showMessage(message) {
+        pageMessage.hidden = false;
+        pageMessage.textContent = message;
+    }
+
+    function addCell(row, value) {
+        const cell = document.createElement("td");
+        cell.textContent = value ?? "—";
+        row.appendChild(cell);
+    }
+
+    function formatDate(value) {
+        if (!value) return "—";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+
+        return date.toLocaleString();
+    }
+
+    async function loadAssetDetails() {
+        const parts = window.location.pathname.split("/");
+        const assetId = parts[parts.length - 1];
+
+        if (!/^\d+$/.test(assetId)) {
+            showMessage("Invalid asset ID.");
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/assets/${encodeURIComponent(assetId)}`,
+                { credentials: "same-origin" }
+            );
+
+            if (response.status === 401 || response.status === 403) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (response.status === 404) {
+                showMessage("Asset not found or you don't have access to it.");
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error("Could not load asset details.");
+            }
+
+            const result = await response.json();
+            const asset = result.asset;
+            const versions = result.versions || [];
+            const usages = result.usages || [];
+
+            document.getElementById("asset-name").textContent =
+                asset.name || "Untitled Asset";
+
+            document.getElementById("asset-type").textContent =
+                asset.type || "Unknown";
+
+            document.getElementById("asset-id").textContent = asset.id;
+
+            document.getElementById("version-count").textContent =
+                versions.length;
+
+            document.getElementById("detail-name").textContent =
+                asset.name || "Untitled";
+
+            document.getElementById("public-id").textContent =
+                asset.publicId || "—";
+
+            document.getElementById("asset-tags").textContent =
+                Array.isArray(asset.tags) ? asset.tags.join(", ") : "—";
+
+            document.getElementById("current-version").textContent =
+                asset.currentVersionId ?? "—";
+
+            // Render version history.
+            const versionList = document.getElementById("version-list");
+            versionList.replaceChildren();
+
+            if (versions.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+
+                cell.colSpan = 4;
+                cell.textContent = "No version records found.";
+
+                row.appendChild(cell);
+                versionList.appendChild(row);
+            } else {
+                versions.forEach(version => {
+                    const row = document.createElement("tr");
+
+                    addCell(row, version.version);
+                    addCell(row, version.mimeType);
+                    addCell(
+                        row,
+                        version.sizeBytes == null
+                            ? "—"
+                            : `${Number(version.sizeBytes).toLocaleString()} bytes`
+                    );
+                    addCell(row, version.storageKey);
+
+                    versionList.appendChild(row);
+                });
+            }
+
+            // Render website usage.
+            const usageList = document.getElementById("usage-list");
+            usageList.replaceChildren();
+
+            if (usages.length === 0) {
+                const row = document.createElement("tr");
+                const cell = document.createElement("td");
+
+                cell.colSpan = 3;
+                cell.textContent = "No website usage recorded.";
+
+                row.appendChild(cell);
+                usageList.appendChild(row);
+            } else {
+                usages.forEach(usage => {
+                    const row = document.createElement("tr");
+
+                    addCell(row, usage.website);
+                    addCell(row, usage.pageUrl);
+                    addCell(row, formatDate(usage.lastSeen));
+
+                    usageList.appendChild(row);
+                });
+            }
+
+            pageMessage.hidden = true;
+            assetContent.hidden = false;
+
+        } catch (error) {
+            console.error("Asset details error:", error);
+            showMessage("Unable to load this asset. Please refresh and try again.");
+        }
+    }
+
+    loadAssetDetails();
+</script>
+
+{% endblock %}

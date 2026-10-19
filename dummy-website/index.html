@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAM Client Website Demo</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6fa;
+            color: #182230;
+        }
+
+        header {
+            background: #172033;
+            color: white;
+            padding: 24px 7%;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        header p {
+            margin: 0;
+            color: #cbd5e1;
+        }
+
+        main {
+            max-width: 900px;
+            margin: 35px auto;
+            padding: 0 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 24px;
+            margin-bottom: 22px;
+            border-radius: 12px;
+            box-shadow: 0 3px 15px #1822300d;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin: 16px 0 8px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccd3df;
+            border-radius: 7px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 16px;
+            padding: 12px 18px;
+            border: 0;
+            border-radius: 7px;
+            background: #3157d5;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        #status {
+            margin-top: 16px;
+            overflow-wrap: anywhere;
+        }
+
+        #asset-image {
+            display: none;
+            max-width: 100%;
+            max-height: 480px;
+            object-fit: contain;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .metadata {
+            line-height: 1.8;
+            overflow-wrap: anywhere;
+        }
+
+        .muted {
+            color: #64748b;
+        }
+
+        code {
+            overflow-wrap: anywhere;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Client Website Demo</h1>
+        <p>Testing real assets delivered by our Digital Asset Management API</p>
+    </header>
+
+    <main>
+        <section class="panel">
+            <h2>Connect to the DAM</h2>
+            <p class="muted">
+                Enter an uploaded asset's public ID and the API key
+                generated for this demo website.
+            </p>
+
+            <label for="asset-id">Public Asset ID</label>
+            <input
+                id="asset-id"
+                placeholder="ast_..."
+                autocomplete="off"
+            >
+
+            <label for="api-key">Website API Key</label>
+            <input
+                id="api-key"
+                type="password"
+                placeholder="dam_live_..."
+                autocomplete="off"
+            >
+
+            <button id="load-button" type="button">
+                Load Asset
+            </button>
+
+            <p id="status" role="status" aria-live="polite">
+                Ready to connect.
+            </p>
+        </section>
+
+        <section class="panel">
+            <h2>Asset Preview</h2>
+
+            <div id="asset-info" class="metadata">
+                No asset loaded yet.
+            </div>
+
+            <img id="asset-image" alt="DAM asset preview">
+        </section>
+
+        <section class="panel">
+            <h2>Integration Checks</h2>
+            <p id="metadata-check">○ Asset metadata: not tested</p>
+            <p id="image-check">○ Image delivery: not tested</p>
+            <p id="usage-check">○ Usage reporting: not tested</p>
+        </section>
+    </main>
+
+    <script>
+        const DAM_API = "http://127.0.0.1:5000";
+
+        const assetIdInput = document.getElementById("asset-id");
+        const apiKeyInput = document.getElementById("api-key");
+        const loadButton = document.getElementById("load-button");
+        const statusBox = document.getElementById("status");
+        const assetInfo = document.getElementById("asset-info");
+        const assetImage = document.getElementById("asset-image");
+
+        const metadataCheck = document.getElementById("metadata-check");
+        const imageCheck = document.getElementById("image-check");
+        const usageCheck = document.getElementById("usage-check");
+
+        function setStatus(message) {
+            statusBox.textContent = message;
+        }
+
+        function setCheck(element, passed, message) {
+            element.textContent =
+                (passed ? "✓ " : "✗ ") + message;
+        }
+
+        loadButton.addEventListener("click", loadAsset);
+
+        async function loadAsset() {
+            const publicId = assetIdInput.value.trim();
+            const apiKey = apiKeyInput.value.trim();
+
+            if (!publicId || !apiKey) {
+                setStatus("Enter both the public asset ID and website API key.");
+                return;
+            }
+
+            loadButton.disabled = true;
+            assetImage.style.display = "none";
+            assetInfo.textContent = "Loading asset...";
+            setStatus("Requesting asset metadata from the DAM...");
+
+            setCheck(metadataCheck, false, "Asset metadata: pending");
+            setCheck(imageCheck, false, "Image delivery: pending");
+            setCheck(usageCheck, false, "Usage reporting: pending");
+
+            try {
+                // Step 1: Retrieve the asset's public metadata.
+                const response = await fetch(
+                    DAM_API + "/api/public/assets/" +
+                    encodeURIComponent(publicId)
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Asset API returned HTTP " + response.status
+                    );
+                }
+
+                const asset = await response.json();
+
+                setCheck(metadataCheck, true, "Asset metadata: received");
+
+                assetInfo.replaceChildren();
+
+                const details = [
+                    ["Name", asset.name],
+                    ["Public ID", asset.publicId],
+                    ["Type", asset.type],
+                    ["Version", asset.version],
+                    ["MIME type", asset.mimeType],
+                    ["Size", formatBytes(asset.sizeBytes)]
+                ];
+
+                for (const [label, value] of details) {
+                    const row = document.createElement("div");
+                    const strong = document.createElement("strong");
+                    strong.textContent = label + ": ";
+                    row.append(strong, document.createTextNode(
+                        value == null ? "Unavailable" : String(value)
+                    ));
+                    assetInfo.appendChild(row);
+                }
+
+                setStatus("Metadata received. Loading the actual asset file...");
+
+                // Step 2: Display the actual file returned by the API.
+                if (asset.type === "image" && asset.url) {
+                    const imageLoaded = new Promise((resolve, reject) => {
+                        assetImage.onload = resolve;
+                        assetImage.onerror = () => reject(
+                            new Error("The image URL could not be loaded.")
+                        );
+                    });
+
+                    assetImage.src = asset.url;
+                    assetImage.style.display = "block";
+
+                    await imageLoaded;
+
+                    setCheck(imageCheck, true, "Image delivery: loaded");
+                } else {
+                    setCheck(
+                        imageCheck,
+                        false,
+                        "Image delivery: this demo preview expects an image asset"
+                    );
+                }
+
+                // Step 3: Report where the asset is being used.
+                const usageResponse = await fetch(
+                    DAM_API + "/api/public/usages",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer " + apiKey
+                        },
+                        body: JSON.stringify({
+                            publicId: asset.publicId,
+                            pageUrl: window.location.href
+                        })
+                    }
+                );
+
+                if (!usageResponse.ok) {
+                    throw new Error(
+                        "Usage reporting returned HTTP " +
+                        usageResponse.status
+                    );
+                }
+
+                setCheck(usageCheck, true, "Usage reporting: accepted");
+                setStatus("Success! The DAM integration is working.");
+
+            } catch (error) {
+                setStatus("Integration error: " + error.message);
+            } finally {
+                loadButton.disabled = false;
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (bytes == null) return "Unavailable";
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " KB";
+            }
+            return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+        }
+    </script>
+</body>
+</html>

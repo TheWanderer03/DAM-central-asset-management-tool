@@ -1,8 +1,96 @@
-venv/
+
+# ==============================
+# Python
+# ==============================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# ==============================
+# Virtual environments
+# ==============================
+.venv/
+venv/
+env/
+ENV/
+
+# ==============================
+# Environment variables / secrets
+# ==============================
 .env
-uploads/*
-!uploads/.gitkeep
-instance/
+.env.*
+!.env.example
+
+# ==============================
+# Python packaging / build
+# ==============================
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+pip-wheel-metadata/
+
+# ==============================
+# Testing / coverage
+# ==============================
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+nosetests.xml
+test-results/
+
+# ==============================
+# Type checking / linting
+# ==============================
+.mypy_cache/
+.dmypy.json
+.pyre/
+.ruff_cache/
+
+# ==============================
+# Flask / application logs
+# ==============================
+instance/
+*.log
+
+# ==============================
+# Database / local data
+# ==============================
+*.sqlite
+*.sqlite3
+*.db
+
+# ==============================
+# Uploaded files / local storage
+# ==============================
+uploads/
+instance/uploads/
+
+# ==============================
+# Editors / IDEs
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==============================
+# Operating system files
+# ==============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==============================
+# Temporary files
+# ==============================
+*.tmp
+*.bak
+*.orig

@@ -1,0 +1,570 @@
+
+{% extends "base.html" %}
+
+{% block title %}Websites | AssetVault{% endblock %}
+{% block page_name %}Websites{% endblock %}
+
+{% block content %}
+<style>
+    .website-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+    }
+
+    .website-card {
+        background: white;
+        border: 1px solid #e4e8f1;
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 20px;
+    }
+
+    .website-table-wrap {
+        overflow-x: auto;
+    }
+
+    .website-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    .website-table th {
+        color: #78849a;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        padding: 14px 10px;
+        border-bottom: 1px solid #e4e8f1;
+    }
+
+    .website-table td {
+        padding: 16px 10px;
+        border-bottom: 1px solid #edf0f6;
+        vertical-align: top;
+    }
+
+    .website-muted {
+        color: #78849a;
+        font-size: 13px;
+    }
+
+    .website-btn {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #6654f5;
+        color: white;
+    }
+
+    .website-btn.secondary {
+        background: #f0efff;
+        color: #5946e8;
+    }
+
+    .website-btn.danger {
+        background: #fff0f0;
+        color: #b42318;
+    }
+
+    .website-btn:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    .website-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .website-field {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .website-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .website-field label {
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .website-field input {
+        width: 100%;
+        border: 1px solid #dce2ed;
+        border-radius: 8px;
+        padding: 12px;
+        font: inherit;
+        box-sizing: border-box;
+    }
+
+    .website-field input:focus {
+        outline: 2px solid #d7d1ff;
+        border-color: #6654f5;
+    }
+
+    .website-message {
+        display: none;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 16px;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+
+    .website-message.error {
+        display: block;
+        color: #b42318;
+        background: #fff0f0;
+    }
+
+    .website-message.success {
+        display: block;
+        color: #067647;
+        background: #ecfdf3;
+    }
+
+    .website-key {
+        background: #f6f7fb;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 10px;
+        overflow-wrap: anywhere;
+        font-family: monospace;
+    }
+
+    .website-key-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .website-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .website-empty {
+        text-align: center;
+        padding: 40px 16px;
+        color: #78849a;
+    }
+
+    .website-empty h3 {
+        color: #17233c;
+        margin-bottom: 8px;
+    }
+
+    .website-key-list {
+        display: grid;
+        gap: 10px;
+        min-width: 240px;
+    }
+
+    @media (max-width: 640px) {
+        .website-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .website-field.full {
+            grid-column: auto;
+        }
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <h1>Websites</h1>
+        <p class="page-description">
+            Connect websites and manage secure access to your assets.
+        </p>
+    </div>
+</div>
+
+<div id="website-message" class="website-message" role="status"
+     aria-live="polite"></div>
+
+<div id="new-key-panel" class="website-card" hidden>
+    <h2>New API key</h2>
+    <p class="website-muted">
+        Copy this key now. The complete secret will not be shown again.
+    </p>
+    <div id="new-key-value" class="website-key"></div>
+    <div class="website-key-row">
+        <button type="button" class="website-btn secondary"
+                id="copy-key-btn">Copy API key</button>
+        <button type="button" class="website-btn"
+                id="dismiss-key-btn">I've saved it</button>
+    </div>
+</div>
+
+<div class="website-card">
+    <div class="website-toolbar">
+        <div>
+            <h2>Connect a website</h2>
+            <p class="website-muted">
+                Register a website to manage its asset access.
+            </p>
+        </div>
+    </div>
+
+    <form id="website-form">
+        <div class="website-form-grid">
+            <div class="website-field">
+                <label for="website-name">Website name</label>
+                <input id="website-name" name="name"
+                       placeholder="My Company Website" required>
+            </div>
+
+            <div class="website-field">
+                <label for="website-domain">Domain</label>
+                <input id="website-domain" name="domain"
+                       placeholder="example.com" required>
+            </div>
+
+            <div class="website-field full">
+                <label for="website-webhook">Webhook URL (optional)</label>
+                <input id="website-webhook" name="webhookUrl"
+                       type="url" placeholder="https://example.com/webhook">
+            </div>
+
+            <div class="website-field full">
+                <div>
+                    <button class="website-btn" type="submit"
+                            id="create-website-btn">Connect Website</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="website-card">
+    <div class="website-toolbar">
+        <div>
+            <h2>Connected websites</h2>
+            <p class="website-muted">
+                Website registrations and their API keys.
+            </p>
+        </div>
+        <button class="website-btn secondary" type="button"
+                id="refresh-websites-btn">Refresh</button>
+    </div>
+
+    <div class="website-table-wrap">
+        <table class="website-table">
+            <thead>
+                <tr>
+                    <th>Website</th>
+                    <th>Domain</th>
+                    <th>API keys</th>
+                    <th>Added</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="websites-table-body">
+                <tr>
+                    <td colspan="5" class="website-empty">
+                        Loading websites...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+(() => {
+    const form = document.getElementById("website-form");
+    const tableBody = document.getElementById("websites-table-body");
+    const messageBox = document.getElementById("website-message");
+    const createButton = document.getElementById("create-website-btn");
+    const keyPanel = document.getElementById("new-key-panel");
+    const keyValue = document.getElementById("new-key-value");
+
+    let latestKey = "";
+
+    function showMessage(message, type = "success") {
+        messageBox.textContent = message;
+        messageBox.className = "website-message " + type;
+    }
+
+    function clearMessage() {
+        messageBox.textContent = "";
+        messageBox.className = "website-message";
+    }
+
+    async function api(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            ...options,
+            headers: {
+                ...(options.body ? {"Content-Type": "application/json"} : {}),
+                ...(options.headers || {})
+            }
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || data.error || `Request failed (${response.status})`
+            );
+        }
+
+        return data;
+    }
+
+    function makeButton(label, className, callback) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "website-btn " + className;
+        button.textContent = label;
+        button.addEventListener("click", callback);
+        return button;
+    }
+
+    function renderWebsites(websites) {
+        tableBody.replaceChildren();
+
+        if (!websites.length) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 5;
+            cell.className = "website-empty";
+
+            const heading = document.createElement("h3");
+            heading.textContent = "No websites connected yet";
+
+            const description = document.createElement("p");
+            description.textContent =
+                "Register your first website using the form above.";
+
+            cell.append(heading, description);
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+            return;
+        }
+
+        websites.forEach(site => {
+            const row = document.createElement("tr");
+
+            const nameCell = document.createElement("td");
+            const name = document.createElement("strong");
+            name.textContent = site.name;
+
+            const id = document.createElement("div");
+            id.className = "website-muted";
+            id.textContent = `Website ID: ${site.id}`;
+
+            nameCell.append(name, id);
+
+            const domainCell = document.createElement("td");
+            domainCell.textContent = site.domain;
+
+            const keysCell = document.createElement("td");
+            const keyList = document.createElement("div");
+            keyList.className = "website-key-list";
+
+            if (!site.apiKeys.length) {
+                const empty = document.createElement("span");
+                empty.className = "website-muted";
+                empty.textContent = "No API keys";
+                keyList.appendChild(empty);
+            } else {
+                site.apiKeys.forEach(key => {
+                    const item = document.createElement("div");
+                    const prefix = document.createElement("div");
+                    prefix.textContent = key.prefix;
+                    prefix.style.fontFamily = "monospace";
+
+                    const status = document.createElement("div");
+                    status.className = "website-muted";
+                    status.textContent = key.revoked ? "Revoked" : "Active";
+
+                    item.append(prefix, status);
+
+                    if (!key.revoked) {
+                        item.appendChild(makeButton(
+                            "Revoke key",
+                            "danger",
+                            () => revokeKey(site.id, key.id)
+                        ));
+                    }
+
+                    keyList.appendChild(item);
+                });
+            }
+
+            keysCell.appendChild(keyList);
+
+            const dateCell = document.createElement("td");
+            dateCell.textContent = site.createdAt
+                ? new Date(site.createdAt).toLocaleDateString()
+                : "—";
+
+            const actionsCell = document.createElement("td");
+            const actions = document.createElement("div");
+            actions.className = "website-actions";
+
+            actions.appendChild(makeButton(
+                "Generate API key",
+                "secondary",
+                () => generateKey(site.id)
+            ));
+
+            actionsCell.appendChild(actions);
+
+            row.append(
+                nameCell,
+                domainCell,
+                keysCell,
+                dateCell,
+                actionsCell
+            );
+
+            tableBody.appendChild(row);
+        });
+    }
+
+    async function loadWebsites() {
+        clearMessage();
+        tableBody.replaceChildren();
+
+        const loadingRow = document.createElement("tr");
+        const loadingCell = document.createElement("td");
+        loadingCell.colSpan = 5;
+        loadingCell.className = "website-empty";
+        loadingCell.textContent = "Loading websites...";
+        loadingRow.appendChild(loadingCell);
+        tableBody.appendChild(loadingRow);
+
+        try {
+            const websites = await api("/api/websites");
+            renderWebsites(websites);
+        } catch (error) {
+            tableBody.replaceChildren();
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 5;
+            cell.className = "website-empty";
+            cell.textContent = "Unable to load websites.";
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+            showMessage(error.message, "error");
+        }
+    }
+
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        clearMessage();
+
+        createButton.disabled = true;
+        createButton.textContent = "Connecting...";
+
+        try {
+            const result = await api("/api/websites", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: document.getElementById("website-name").value.trim(),
+                    domain: document.getElementById("website-domain").value.trim(),
+                    webhookUrl: document.getElementById("website-webhook").value.trim()
+                })
+            });
+
+            form.reset();
+            showMessage(`Website "${result.website.name}" connected.`);
+            await loadWebsites();
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            createButton.disabled = false;
+            createButton.textContent = "Connect Website";
+        }
+    });
+
+    async function generateKey(websiteId) {
+        if (!confirm("Generate a new API key for this website?")) return;
+
+        clearMessage();
+
+        try {
+            const result = await api(`/api/websites/${websiteId}/keys`, {
+                method: "POST"
+            });
+
+            latestKey = result.apiKey;
+            keyValue.textContent = latestKey;
+            keyPanel.hidden = false;
+            keyPanel.scrollIntoView({behavior: "smooth", block: "center"});
+
+            showMessage("API key generated. Copy and save it now.");
+            await loadWebsites();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    async function revokeKey(websiteId, keyId) {
+        if (!confirm("Revoke this API key? This may interrupt integrations using it.")) {
+            return;
+        }
+
+        clearMessage();
+
+        try {
+            await api(`/api/websites/${websiteId}/keys/${keyId}/revoke`, {
+                method: "POST"
+            });
+
+            showMessage("API key revoked.");
+            await loadWebsites();
+        } catch (error) {
+            showMessage(error.message, "error");
+        }
+    }
+
+    document.getElementById("copy-key-btn").addEventListener("click", async () => {
+        if (!latestKey) return;
+
+        try {
+            await navigator.clipboard.writeText(latestKey);
+            showMessage("API key copied to clipboard.");
+        } catch {
+            showMessage(
+                "Clipboard access was blocked. Select and copy the key manually.",
+                "error"
+            );
+        }
+    });
+
+    document.getElementById("dismiss-key-btn").addEventListener("click", () => {
+        latestKey = "";
+        keyValue.textContent = "";
+        keyPanel.hidden = true;
+    });
+
+    document.getElementById("refresh-websites-btn").addEventListener(
+        "click",
+        loadWebsites
+    );
+
+    loadWebsites();
+})();
+</script>
+{% endblock %}
