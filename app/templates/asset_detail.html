@@ -5,259 +5,589 @@
 {% block breadcrumb %}Assets / Details{% endblock %}
 
 {% block content %}
-
 <div class="page-heading">
     <div>
         <h1 id="asset-name">Asset Details</h1>
-        <p>View asset information, version history, and website usage.</p>
+        <p>View and manage asset information, version history, and website usage.</p>
     </div>
 
-    <a href="/assets" class="primary-button"
-       style="text-decoration: none; display: inline-block;">
-        Back to Assets
-    </a>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+        <button
+            id="edit-asset-button"
+            type="button"
+            class="primary-button"
+            onclick="toggleEditForm(true)"
+            hidden
+        >
+            Edit Asset
+        </button>
+
+        <button
+            id="remove-asset-button"
+            type="button"
+            class="primary-button"
+            onclick="removeAsset()"
+            style="background:#dc2626; border:none; cursor:pointer;"
+        >
+            Remove Asset
+        </button>
+
+        <a
+            href="/assets"
+            class="primary-button"
+            style="text-decoration:none; display:inline-block;"
+        >
+            Back to Assets
+        </a>
+    </div>
 </div>
 
-<div id="page-message" class="panel" style="padding: 24px;">
+<div
+    id="page-message"
+    class="panel"
+    style="padding:24px;"
+    role="status"
+>
     Loading asset details...
 </div>
 
-<div id="asset-content" hidden>
+<!-- Edit Asset Form -->
+<div id="edit-asset-panel" class="panel" style="padding:24px; margin-bottom:24px;" hidden>
+    <h2 style="margin-top:0;">Edit Asset</h2>
+    <p>Update the asset name and tags. Version files and asset IDs will remain unchanged.</p>
 
+    <form id="edit-asset-form">
+        <div style="margin-bottom:18px;">
+            <label for="edit-asset-name" style="display:block; margin-bottom:8px;">
+                Asset Name
+            </label>
+
+            <input
+                id="edit-asset-name"
+                name="name"
+                type="text"
+                maxlength="200"
+                required
+                style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #d1d5db; border-radius:8px;"
+            >
+        </div>
+
+        <div style="margin-bottom:18px;">
+            <label for="edit-asset-tags" style="display:block; margin-bottom:8px;">
+                Tags
+            </label>
+
+            <input
+                id="edit-asset-tags"
+                name="tags"
+                type="text"
+                placeholder="marketing, logo, campaign"
+                style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #d1d5db; border-radius:8px;"
+            >
+
+            <small style="display:block; margin-top:6px; color:#6b7280;">
+                Separate tags with commas. Leave empty to remove all tags.
+            </small>
+        </div>
+
+        <p id="edit-message" role="status" aria-live="polite" hidden></p>
+
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <button
+                id="save-asset-button"
+                type="submit"
+                class="primary-button"
+            >
+                Save Changes
+            </button>
+
+            <button
+                type="button"
+                class="primary-button"
+                onclick="toggleEditForm(false)"
+                style="background:#6b7280; border:none;"
+            >
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Asset Details -->
+<div id="asset-content" hidden>
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-label">Asset Type</div>
-            <div class="stat-value" id="asset-type">—</div>
-            <div class="stat-note">File format category</div>
+            <span class="stat-label">Asset Type</span>
+            <strong id="asset-type">—</strong>
         </div>
 
         <div class="stat-card">
-            <div class="stat-label">Asset ID</div>
-            <div class="stat-value" id="asset-id">—</div>
-            <div class="stat-note">Internal identifier</div>
+            <span class="stat-label">Asset ID</span>
+            <strong id="asset-id">—</strong>
         </div>
 
         <div class="stat-card">
-            <div class="stat-label">Versions</div>
-            <div class="stat-value" id="version-count">0</div>
-            <div class="stat-note">Recorded asset versions</div>
+            <span class="stat-label">Versions</span>
+            <strong id="version-count">0</strong>
         </div>
     </div>
 
-    <div class="panel" style="margin-top: 24px;">
-        <div class="panel-heading">
-            <h2>Asset Information</h2>
+    <div class="panel" style="padding:24px; margin-bottom:24px;">
+        <h2 style="margin-top:0;">Asset Information</h2>
+
+        <div style="margin-bottom:16px;">
+            <strong>Name:</strong>
+            <span id="detail-name">—</span>
         </div>
 
-        <div style="padding: 20px;">
-            <p><strong>Name:</strong> <span id="detail-name"></span></p>
-            <p><strong>Public ID:</strong> <span id="public-id"></span></p>
-            <p><strong>Tags:</strong> <span id="asset-tags"></span></p>
-            <p><strong>Current Version ID:</strong>
-                <span id="current-version"></span>
-            </p>
+        <div style="margin-bottom:16px;">
+            <strong>Public ID:</strong>
+            <span id="public-id">—</span>
+        </div>
+
+        <div style="margin-bottom:16px;">
+            <strong>Tags:</strong>
+            <span id="asset-tags">—</span>
+        </div>
+
+        <div>
+            <strong>Current Version:</strong>
+            <span id="current-version">—</span>
         </div>
     </div>
 
-    <div class="panel" style="margin-top: 24px;">
-        <div class="panel-heading">
-            <h2>Version History</h2>
-            <span id="version-label">All versions</span>
+    <div class="panel" style="padding:24px; margin-bottom:24px;">
+        <h2 style="margin-top:0;">Version History</h2>
+
+        <div style="overflow-x:auto;">
+            <table style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>File Size</th>
+                        <th>MIME Type</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+
+                <tbody id="version-list">
+                    <tr>
+                        <td colspan="4">Loading versions...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-
-        <table class="asset-table">
-            <thead>
-                <tr>
-                    <th>Version</th>
-                    <th>File Type</th>
-                    <th>Size</th>
-                    <th>Storage Key</th>
-                </tr>
-            </thead>
-
-            <tbody id="version-list">
-                <tr>
-                    <td colspan="4">Loading versions...</td>
-                </tr>
-            </tbody>
-        </table>
     </div>
 
-    <div class="panel" style="margin-top: 24px;">
-        <div class="panel-heading">
-            <h2>Website Usage</h2>
-            <span>Where this asset is used</span>
+    <div class="panel" style="padding:24px;">
+        <h2 style="margin-top:0;">Website Usage</h2>
+
+        <div style="overflow-x:auto;">
+            <table style="width:100%;">
+                <thead>
+                    <tr>
+                        <th>Website</th>
+                        <th>Usage Details</th>
+                    </tr>
+                </thead>
+
+                <tbody id="usage-list">
+                    <tr>
+                        <td colspan="2">Loading website usage...</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
-
-        <table class="asset-table">
-            <thead>
-                <tr>
-                    <th>Website</th>
-                    <th>Page URL</th>
-                    <th>Last Seen</th>
-                </tr>
-            </thead>
-
-            <tbody id="usage-list">
-                <tr>
-                    <td colspan="3">Loading website usage...</td>
-                </tr>
-            </tbody>
-        </table>
     </div>
-
 </div>
 
 <script>
-    const pageMessage = document.getElementById("page-message");
-    const assetContent = document.getElementById("asset-content");
+const pageMessage = document.getElementById("page-message");
+const assetContent = document.getElementById("asset-content");
+const removeButton = document.getElementById("remove-asset-button");
+const editButton = document.getElementById("edit-asset-button");
+const editPanel = document.getElementById("edit-asset-panel");
+const editForm = document.getElementById("edit-asset-form");
+const editNameInput = document.getElementById("edit-asset-name");
+const editTagsInput = document.getElementById("edit-asset-tags");
+const editMessage = document.getElementById("edit-message");
+const saveButton = document.getElementById("save-asset-button");
 
-    function showMessage(message) {
-        pageMessage.hidden = false;
-        pageMessage.textContent = message;
+let currentAsset = null;
+
+function getAssetId() {
+    const parts = window.location.pathname.split("/");
+    return parts[parts.length - 1];
+}
+
+function showMessage(message) {
+    pageMessage.hidden = false;
+    pageMessage.textContent = message;
+}
+
+function addCell(row, value) {
+    const cell = document.createElement("td");
+    cell.textContent = value ?? "—";
+    row.appendChild(cell);
+}
+
+function formatDate(value) {
+    if (!value) return "—";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(value);
     }
 
-    function addCell(row, value) {
-        const cell = document.createElement("td");
-        cell.textContent = value ?? "—";
-        row.appendChild(cell);
+    return date.toLocaleString();
+}
+
+function formatBytes(bytes) {
+    const size = Number(bytes);
+
+    if (!Number.isFinite(size) || size < 0) {
+        return "—";
     }
 
-    function formatDate(value) {
-        if (!value) return "—";
-
-        const date = new Date(value);
-
-        if (Number.isNaN(date.getTime())) {
-            return String(value);
-        }
-
-        return date.toLocaleString();
+    if (size < 1024) {
+        return `${size} B`;
     }
 
-    async function loadAssetDetails() {
-        const parts = window.location.pathname.split("/");
-        const assetId = parts[parts.length - 1];
+    if (size < 1024 * 1024) {
+        return `${(size / 1024).toFixed(1)} KB`;
+    }
 
-        if (!/^\d+$/.test(assetId)) {
-            showMessage("Invalid asset ID.");
+    if (size < 1024 * 1024 * 1024) {
+        return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function displayTags(tags) {
+    if (Array.isArray(tags)) {
+        return tags.length ? tags.join(", ") : "No tags";
+    }
+
+    if (typeof tags === "string" && tags.trim()) {
+        return tags;
+    }
+
+    return "No tags";
+}
+
+function toggleEditForm(show) {
+    if (!currentAsset) {
+        return;
+    }
+
+    editPanel.hidden = !show;
+    editMessage.hidden = true;
+    editMessage.textContent = "";
+
+    if (show) {
+        editNameInput.value = currentAsset.name || "";
+
+        const tags = currentAsset.tags;
+
+        editTagsInput.value = Array.isArray(tags)
+            ? tags.join(", ")
+            : (tags || "");
+
+        editNameInput.focus();
+    }
+}
+
+function showEditMessage(message, isError = false) {
+    editMessage.hidden = false;
+    editMessage.textContent = message;
+    editMessage.style.color = isError ? "#dc2626" : "#15803d";
+}
+
+async function saveAssetChanges(event) {
+    event.preventDefault();
+
+    const assetId = getAssetId();
+    const name = editNameInput.value.trim();
+    const tags = editTagsInput.value
+        .split(",")
+        .map(tag => tag.trim())
+        .filter(Boolean);
+
+    if (!/^\d+$/.test(assetId)) {
+        showEditMessage("Invalid asset ID.", true);
+        return;
+    }
+
+    if (!name) {
+        showEditMessage("Asset name cannot be empty.", true);
+        editNameInput.focus();
+        return;
+    }
+
+    if (name.length > 200) {
+        showEditMessage("Asset name cannot exceed 200 characters.", true);
+        return;
+    }
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+
+    try {
+        const response = await fetch(
+            `/api/assets/${encodeURIComponent(assetId)}`,
+            {
+                method: "PATCH",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    name: name,
+                    tags: tags
+                })
+            }
+        );
+
+        if (response.status === 401) {
+            window.location.href = "/login";
             return;
         }
 
-        try {
-            const response = await fetch(
-                `/api/assets/${encodeURIComponent(assetId)}`,
-                { credentials: "same-origin" }
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(
+                result.message ||
+                result.error ||
+                (response.status === 403
+                    ? "You do not have permission to edit this asset."
+                    : "Failed to save asset changes.")
             );
-
-            if (response.status === 401 || response.status === 403) {
-                window.location.href = "/login";
-                return;
-            }
-
-            if (response.status === 404) {
-                showMessage("Asset not found or you don't have access to it.");
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error("Could not load asset details.");
-            }
-
-            const result = await response.json();
-            const asset = result.asset;
-            const versions = result.versions || [];
-            const usages = result.usages || [];
-
-            document.getElementById("asset-name").textContent =
-                asset.name || "Untitled Asset";
-
-            document.getElementById("asset-type").textContent =
-                asset.type || "Unknown";
-
-            document.getElementById("asset-id").textContent = asset.id;
-
-            document.getElementById("version-count").textContent =
-                versions.length;
-
-            document.getElementById("detail-name").textContent =
-                asset.name || "Untitled";
-
-            document.getElementById("public-id").textContent =
-                asset.publicId || "—";
-
-            document.getElementById("asset-tags").textContent =
-                Array.isArray(asset.tags) ? asset.tags.join(", ") : "—";
-
-            document.getElementById("current-version").textContent =
-                asset.currentVersionId ?? "—";
-
-            // Render version history.
-            const versionList = document.getElementById("version-list");
-            versionList.replaceChildren();
-
-            if (versions.length === 0) {
-                const row = document.createElement("tr");
-                const cell = document.createElement("td");
-
-                cell.colSpan = 4;
-                cell.textContent = "No version records found.";
-
-                row.appendChild(cell);
-                versionList.appendChild(row);
-            } else {
-                versions.forEach(version => {
-                    const row = document.createElement("tr");
-
-                    addCell(row, version.version);
-                    addCell(row, version.mimeType);
-                    addCell(
-                        row,
-                        version.sizeBytes == null
-                            ? "—"
-                            : `${Number(version.sizeBytes).toLocaleString()} bytes`
-                    );
-                    addCell(row, version.storageKey);
-
-                    versionList.appendChild(row);
-                });
-            }
-
-            // Render website usage.
-            const usageList = document.getElementById("usage-list");
-            usageList.replaceChildren();
-
-            if (usages.length === 0) {
-                const row = document.createElement("tr");
-                const cell = document.createElement("td");
-
-                cell.colSpan = 3;
-                cell.textContent = "No website usage recorded.";
-
-                row.appendChild(cell);
-                usageList.appendChild(row);
-            } else {
-                usages.forEach(usage => {
-                    const row = document.createElement("tr");
-
-                    addCell(row, usage.website);
-                    addCell(row, usage.pageUrl);
-                    addCell(row, formatDate(usage.lastSeen));
-
-                    usageList.appendChild(row);
-                });
-            }
-
-            pageMessage.hidden = true;
-            assetContent.hidden = false;
-
-        } catch (error) {
-            console.error("Asset details error:", error);
-            showMessage("Unable to load this asset. Please refresh and try again.");
         }
+
+        currentAsset = result.asset || {
+            ...currentAsset,
+            name: name,
+            tags: tags
+        };
+
+        renderAssetInformation(currentAsset);
+        toggleEditForm(false);
+
+        showEditMessage("Asset updated successfully.");
+        alert("Asset updated successfully.");
+
+    } catch (error) {
+        console.error("Edit asset error:", error);
+        showEditMessage(
+            error.message || "Unable to save changes. Please try again.",
+            true
+        );
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = "Save Changes";
+    }
+}
+
+function renderAssetInformation(asset) {
+    document.getElementById("asset-name").textContent =
+        asset.name || "Asset Details";
+
+    document.getElementById("detail-name").textContent =
+        asset.name || "—";
+
+    document.getElementById("public-id").textContent =
+        asset.public_id || "—";
+
+    document.getElementById("asset-tags").textContent =
+        displayTags(asset.tags);
+}
+
+async function removeAsset() {
+    const assetId = getAssetId();
+
+    if (!/^\d+$/.test(assetId)) {
+        alert("Invalid asset ID.");
+        return;
     }
 
-    loadAssetDetails();
-</script>
+    const confirmed = window.confirm(
+        "Are you sure you want to remove this asset? It will disappear from the active asset list."
+    );
 
+    if (!confirmed) {
+        return;
+    }
+
+    removeButton.disabled = true;
+    removeButton.textContent = "Removing...";
+
+    try {
+        const response = await fetch(
+            `/api/assets/${encodeURIComponent(assetId)}`,
+            {
+                method: "DELETE",
+                credentials: "same-origin"
+            }
+        );
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(
+                result.message ||
+                result.error ||
+                (response.status === 403
+                    ? "You do not have permission to remove this asset."
+                    : "Failed to remove asset.")
+            );
+        }
+
+        window.location.href = "/assets";
+
+    } catch (error) {
+        console.error("Remove asset error:", error);
+
+        alert(
+            error.message ||
+            "Unable to remove this asset. Please try again."
+        );
+
+        removeButton.disabled = false;
+        removeButton.textContent = "Remove Asset";
+    }
+}
+
+async function loadAssetDetails() {
+    const assetId = getAssetId();
+
+    if (!/^\d+$/.test(assetId)) {
+        showMessage("Invalid asset ID.");
+        removeButton.hidden = true;
+        editButton.hidden = true;
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/assets/${encodeURIComponent(assetId)}`,
+            {
+                credentials: "same-origin"
+            }
+        );
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 404) {
+            showMessage("Asset not found or you don't have access to it.");
+            removeButton.hidden = true;
+            editButton.hidden = true;
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error("Could not load asset details.");
+        }
+
+        const result = await response.json();
+
+        currentAsset = result.asset;
+        const versions = result.versions || [];
+        const usages = result.usages || [];
+
+        renderAssetInformation(currentAsset);
+
+        document.getElementById("asset-type").textContent =
+            currentAsset.type || "—";
+
+        document.getElementById("asset-id").textContent =
+            currentAsset.id ?? assetId;
+
+        document.getElementById("version-count").textContent =
+            versions.length;
+
+        document.getElementById("current-version").textContent =
+            currentAsset.current_version_id ?? "—";
+
+        const versionList = document.getElementById("version-list");
+        versionList.replaceChildren();
+
+        if (versions.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 4;
+            cell.textContent = "No version history available.";
+            row.appendChild(cell);
+            versionList.appendChild(row);
+        } else {
+            versions.forEach(version => {
+                const row = document.createElement("tr");
+
+                addCell(row, version.version_number ?? "—");
+                addCell(row, formatBytes(version.size_bytes));
+                addCell(row, version.mime_type || "—");
+                addCell(row, formatDate(version.created_at));
+
+                versionList.appendChild(row);
+            });
+        }
+
+        const usageList = document.getElementById("usage-list");
+        usageList.replaceChildren();
+
+        if (usages.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 2;
+            cell.textContent = "This asset is not currently used by any website.";
+            row.appendChild(cell);
+            usageList.appendChild(row);
+        } else {
+            usages.forEach(usage => {
+                const row = document.createElement("tr");
+
+                addCell(
+                    row,
+                    usage.website_name ||
+                    usage.website ||
+                    usage.website_id ||
+                    "—"
+                );
+
+                addCell(
+                    row,
+                    usage.description ||
+                    usage.usage_type ||
+                    usage.path ||
+                    "—"
+                );
+
+                usageList.appendChild(row);
+            });
+        }
+
+        pageMessage.hidden = true;
+        assetContent.hidden = false;
+        editButton.hidden = false;
+
+    } catch (error) {
+        console.error("Load asset details error:", error);
+        showMessage("Unable to load this asset. Please refresh and try again.");
+    }
+}
+
+editForm.addEventListener("submit", saveAssetChanges);
+
+loadAssetDetails();
+</script>
 {% endblock %}
