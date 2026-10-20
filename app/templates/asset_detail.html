@@ -12,14 +12,33 @@
         <p>View asset information, version history, and website usage.</p>
     </div>
 
-    <a href="/assets" class="primary-button"
-       style="text-decoration: none; display: inline-block;">
-        Back to Assets
-    </a>
+    <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <button
+            id="replace-asset-button"
+            type="button"
+            class="primary-button"
+            onclick="chooseReplacementFile()"
+            style="border: none; cursor: pointer;"
+            hidden
+        >
+            Replace File
+        </button>
+
+        <input id="replace-file-input" type="file" hidden>
+
+        <a href="/assets" class="primary-button"
+           style="text-decoration: none; display: inline-block;">
+            Back to Assets
+        </a>
+    </div>
 </div>
 
 <div id="page-message" class="panel" style="padding: 24px;">
     Loading asset details...
+</div>
+
+<div id="replace-panel" class="panel" style="padding: 24px; margin-bottom: 24px;" hidden>
+    <p id="replace-message" role="status" aria-live="polite" style="margin: 0;"></p>
 </div>
 
 <div id="asset-content" hidden>
@@ -111,6 +130,25 @@
 <script>
     const pageMessage = document.getElementById("page-message");
     const assetContent = document.getElementById("asset-content");
+    const replaceButton = document.getElementById("replace-asset-button");
+    const replaceInput = document.getElementById("replace-file-input");
+    const replacePanel = document.getElementById("replace-panel");
+    const replaceMessage = document.getElementById("replace-message");
+
+    const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // keep in sync with the server
+
+    const FILE_TYPES = {
+        image: [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"],
+        video: [".mp4", ".webm", ".mov"],
+        document: [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".txt"]
+    };
+
+    let currentAsset = null;
+
+    function getAssetId() {
+        const parts = window.location.pathname.split("/");
+        return parts[parts.length - 1];
+    }
 
     function showMessage(message) {
         pageMessage.hidden = false;
@@ -166,6 +204,7 @@
 
             const result = await response.json();
             const asset = result.asset;
+            currentAsset = asset;
             const versions = result.versions || [];
             const usages = result.usages || [];
 
@@ -250,12 +289,199 @@
 
             pageMessage.hidden = true;
             assetContent.hidden = false;
+            replaceButton.hidden = false;
 
         } catch (error) {
             console.error("Asset details error:", error);
             showMessage("Unable to load this asset. Please refresh and try again.");
         }
     }
+
+    // ---------------------------------------------------------
+    // Replace file (uploads to storage, then records a new version)
+    // ---------------------------------------------------------
+
+    function fileExtension(name) {
+        const text = String(name || "").toLowerCase();
+        const dot = text.lastIndexOf(".");
+        return dot === -1 ? "" : text.slice(dot);
+    }
+
+    // The asset type is "image"/"video"/"document" for newer assets and the
+    // file extension (for example "png") for older ones. Handle both.
+    function categoryOf(value) {
+        const text = String(value || "").toLowerCase();
+
+        if (FILE_TYPES[text]) {
+            return text;
+        }
+
+        const ext = text.startsWith(".") ? text : "." + text;
+
+        for (const category of Object.keys(FILE_TYPES)) {
+            if (FILE_TYPES[category].includes(ext)) {
+                return category;
+            }
+        }
+
+        return null;
+    }
+
+    function showReplaceMessage(message, isError = false) {
+        replacePanel.hidden = false;
+        replaceMessage.textContent = message;
+        replaceMessage.style.color = isError ? "#dc2626" : "#15803d";
+    }
+
+    // POST JSON to our own API; throws an Error with a readable message.
+    async function postJson(url, body) {
+        const response = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            throw new Error("Please log in again.");
+        }
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            if (response.status === 503) {
+                throw new Error("File storage is not configured on the server.");
+            }
+
+            if (response.status === 403) {
+                throw new Error("You do not have permission to replace this asset.");
+            }
+
+            throw new Error(
+                result.message || result.error ||
+                "Request failed (" + response.status + ")."
+            );
+        }
+
+        return result;
+    }
+
+    function chooseReplacementFile() {
+        if (!currentAsset) {
+            return;
+        }
+
+        const category = categoryOf(currentAsset.type);
+        const allowed = category
+            ? FILE_TYPES[category]
+            : [].concat(...Object.values(FILE_TYPES));
+
+        replaceInput.accept = allowed.join(",");
+        replaceInput.value = "";
+        replaceInput.click();
+    }
+
+    async function replaceAssetFile() {
+        const file = replaceInput.files[0];
+
+        if (!file || !currentAsset) {
+            return;
+        }
+
+        const assetId = getAssetId();
+        const category = categoryOf(currentAsset.type);
+        const fileCategory = categoryOf(fileExtension(file.name));
+
+        if (!fileCategory) {
+            showReplaceMessage("This file type is not supported.", true);
+            return;
+        }
+
+        if (category && fileCategory !== category) {
+            showReplaceMessage(
+                "Choose another " + category + " file. A " + category +
+                " asset can only be replaced by a " + category + " file.",
+                true
+            );
+            return;
+        }
+
+        if (file.size === 0) {
+            showReplaceMessage("The selected file is empty.", true);
+            return;
+        }
+
+        if (file.size > MAX_UPLOAD_SIZE) {
+            showReplaceMessage("Maximum upload size is 50 MB.", true);
+            return;
+        }
+
+        const contentType = file.type || "application/octet-stream";
+
+        replaceButton.disabled = true;
+        replaceButton.textContent = "Replacing...";
+
+        try {
+            showReplaceMessage("Preparing upload...");
+            const presigned = await postJson("/api/assets/presign-upload", {
+                assetId: Number(assetId),
+                filename: file.name,
+                contentType: contentType
+            });
+
+            showReplaceMessage("Uploading " + file.name + "...");
+            let putResponse;
+
+            try {
+                // The Content-Type must be exactly what the address was signed for.
+                putResponse = await fetch(presigned.uploadUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": contentType },
+                    body: file
+                });
+            } catch (networkError) {
+                throw new Error("Could not reach file storage. Is MinIO running?");
+            }
+
+            if (!putResponse.ok) {
+                throw new Error(
+                    "Storage rejected the file (" + putResponse.status + ")."
+                );
+            }
+
+            showReplaceMessage("Checking the upload...");
+            await postJson(
+                "/api/assets/" + encodeURIComponent(assetId) + "/confirm-upload",
+                { storageKey: presigned.storageKey }
+            );
+
+            showReplaceMessage("Publishing the new version...");
+            const result = await postJson(
+                "/api/assets/" + encodeURIComponent(assetId) + "/replace-version",
+                { storageKey: presigned.storageKey }
+            );
+
+            await loadAssetDetails();
+            showReplaceMessage(
+                "File replaced. Version " + result.version +
+                " is now live; earlier versions are kept in the history."
+            );
+
+        } catch (error) {
+            console.error("Replace asset error:", error);
+            showReplaceMessage(
+                error.message || "Unable to replace the file. Please try again.",
+                true
+            );
+        } finally {
+            replaceInput.value = "";
+            replaceButton.disabled = false;
+            replaceButton.textContent = "Replace File";
+        }
+    }
+
+    replaceInput.addEventListener("change", replaceAssetFile);
 
     loadAssetDetails();
 </script>
