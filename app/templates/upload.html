@@ -1,256 +1,564 @@
-{% extends "base.html" %}
 
-{% block title %}Upload Assets | AssetVault{% endblock %}
-{% block page_name %}Upload Assets{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Asset | AssetVault</title>
 
-{% block content %}
-
-<div class="page-header">
-    <div>
-        <h1>Upload Assets</h1>
-        <p>Add images, videos, and documents to your asset library.</p>
-    </div>
-
-    <a href="{{ url_for('dashboard.assets_page') }}"
-       class="btn btn-secondary">
-        Back to Assets
-    </a>
-</div>
-
-<div class="card upload-card">
-    <form id="upload-form" enctype="multipart/form-data">
-
-        <div class="upload-area" id="upload-area">
-            <div class="upload-icon">↑</div>
-
-            <h3>Choose a file to upload</h3>
-            <p>Select an image, video, or document from your device.</p>
-
-            <input
-                type="file"
-                id="asset-file"
-                name="file"
-                accept="image/*,video/mp4,video/webm,video/quicktime,.pdf,.doc,.docx,.ppt,.pptx,.txt"
-                required
-            >
-
-            <p id="selected-file" aria-live="polite">
-                No file selected
-            </p>
-        </div>
-
-        <div class="form-group">
-            <label for="asset-name">Asset Name</label>
-            <input
-                type="text"
-                id="asset-name"
-                name="name"
-                placeholder="Enter an asset name"
-                maxlength="200"
-                required
-            >
-        </div>
-
-        <div class="form-group">
-            <label for="asset-tags">Tags</label>
-            <input
-                type="text"
-                id="asset-tags"
-                name="tags"
-                placeholder="e.g. logo, marketing, website"
-            >
-            <small>Separate multiple tags with commas.</small>
-        </div>
-
-        <div id="upload-message" role="status" aria-live="polite"></div>
-
-        <button type="submit"
-                class="btn btn-primary"
-                id="upload-button">
-            Upload Asset
-        </button>
-
-    </form>
-</div>
-
-<script>
-    const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // keep in sync with the server
-
-    const fileInput = document.getElementById("asset-file");
-    const nameInput = document.getElementById("asset-name");
-    const tagsInput = document.getElementById("asset-tags");
-    const selectedFile = document.getElementById("selected-file");
-    const uploadForm = document.getElementById("upload-form");
-    const uploadMessage = document.getElementById("upload-message");
-    const uploadButton = document.getElementById("upload-button");
-
-    fileInput.addEventListener("change", function () {
-        const file = fileInput.files[0];
-
-        uploadMessage.textContent = "";
-
-        if (!file) {
-            selectedFile.textContent = "No file selected";
-            return;
+    <style>
+        * {
+            box-sizing: border-box;
         }
 
-        selectedFile.textContent =
-            file.name + " (" + formatFileSize(file.size) + ")";
-
-        if (!nameInput.value.trim()) {
-            nameInput.value = file.name.replace(/\.[^/.]+$/, "");
-        }
-    });
-
-    function formatFileSize(bytes) {
-        if (bytes < 1024) {
-            return bytes + " B";
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f6fb;
+            color: #171923;
         }
 
-        if (bytes < 1024 * 1024) {
-            return (bytes / 1024).toFixed(1) + " KB";
+        .page {
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 24px;
         }
 
-        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-    }
+        .header {
+            margin-bottom: 28px;
+        }
 
-    // POST JSON to our own API and return the parsed answer.
-    // Throws an Error with a readable message on any failure.
-    async function postJson(url, body) {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body)
+        .header h1 {
+            margin: 0 0 10px;
+            font-size: 30px;
+        }
+
+        .header p {
+            margin: 0;
+            color: #777f91;
+            line-height: 1.6;
+        }
+
+        .card {
+            background: white;
+            border: 1px solid #e7e9f2;
+            border-radius: 20px;
+            padding: 36px;
+            box-shadow: 0 8px 30px rgba(25, 30, 60, 0.04);
+        }
+
+        .drop-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 190px;
+            padding: 30px;
+            border: 2px dashed #c9c4ff;
+            border-radius: 16px;
+            background: #fafaff;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragging {
+            background: #f1efff;
+            border-color: #6657ed;
+        }
+
+        .upload-icon {
+            font-size: 35px;
+            margin-bottom: 12px;
+        }
+
+        .drop-zone strong {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .drop-zone span {
+            color: #81889b;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .selected-file {
+            margin-top: 14px;
+            color: #6b5ce7;
+            font-size: 14px;
+            overflow-wrap: anywhere;
+        }
+
+        .field {
+            margin-top: 26px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px 17px;
+            border: 1px solid #d9deeb;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            background: #fff;
+        }
+
+        input[type="text"]:focus {
+            border-color: #6b5ce7;
+            box-shadow: 0 0 0 3px rgba(107, 92, 231, 0.1);
+        }
+
+        .hint {
+            margin-top: 9px;
+            color: #81889b;
+            font-size: 14px;
+        }
+
+        .message {
+            display: none;
+            padding: 14px 16px;
+            margin-top: 22px;
+            border-radius: 10px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+        }
+
+        .message.error {
+            display: block;
+            color: #a12828;
+            background: #fff0f0;
+            border: 1px solid #ffd5d5;
+        }
+
+        .message.success {
+            display: block;
+            color: #176b40;
+            background: #edfff4;
+            border: 1px solid #c4f0d5;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 50px;
+            padding: 0 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            color: white;
+            background: #6657ed;
+        }
+
+        .btn-primary:hover {
+            background: #5545dc;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            color: #535b70;
+            background: #f0f1f7;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7f0;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 24px;
+            color: #6657ed;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 600px) {
+            .page {
+                margin: 20px auto;
+                padding: 16px;
+            }
+
+            .card {
+                padding: 22px;
+            }
+
+            .header h1 {
+                font-size: 25px;
+            }
+
+            .actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="page">
+        <a class="back-link" href="/assets">ΓåÉ Back to Assets</a>
+
+        <header class="header">
+            <h1>Upload Asset</h1>
+            <p>Add a new file to your organization's digital asset library.</p>
+        </header>
+
+        <section class="card">
+            <form id="uploadForm" enctype="multipart/form-data">
+
+                <label for="fileInput">Choose File</label>
+
+                <div
+                    class="drop-zone"
+                    id="dropZone"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Choose or drop a file to upload"
+                >
+                    <div class="upload-icon">Γåæ</div>
+                    <strong>Click to browse or drag a file here</strong>
+                    <span>
+                        Images, videos, PDFs, Office documents and text files<br>
+                        Maximum file size: 50 MB
+                    </span>
+                </div>
+
+                <input
+                    type="file"
+                    id="fileInput"
+                    name="file"
+                    accept=".png,.jpg,.jpeg,.gif,.webp,.mp4,.webm,.mov,.pdf,.doc,.docx,.ppt,.pptx,.txt"
+                    required
+                >
+
+                <div class="selected-file" id="selectedFile">
+                    No file selected
+                </div>
+
+                <div class="field">
+                    <label for="assetName">Asset Name</label>
+                    <input
+                        type="text"
+                        id="assetName"
+                        name="name"
+                        placeholder="Enter an asset name"
+                        maxlength="255"
+                        required
+                    >
+                </div>
+
+                <div class="field">
+                    <label for="assetTags">Tags</label>
+                    <input
+                        type="text"
+                        id="assetTags"
+                        name="tags"
+                        placeholder="e.g. logo, marketing, website"
+                    >
+                    <div class="hint">Separate multiple tags with commas.</div>
+                </div>
+
+                <div id="message" class="message" role="alert"></div>
+
+                <div class="actions">
+                    <button
+                        type="submit"
+                        class="btn btn-primary"
+                        id="uploadButton"
+                    >
+                        Upload Asset
+                    </button>
+
+                    <a href="/assets" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        const uploadForm = document.getElementById("uploadForm");
+        const fileInput = document.getElementById("fileInput");
+        const assetNameInput = document.getElementById("assetName");
+        const dropZone = document.getElementById("dropZone");
+        const selectedFile = document.getElementById("selectedFile");
+        const uploadButton = document.getElementById("uploadButton");
+        const message = document.getElementById("message");
+
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+        const allowedExtensions = new Set([
+            "png", "jpg", "jpeg", "gif", "webp",
+            "mp4", "webm", "mov",
+            "pdf", "doc", "docx", "ppt", "pptx", "txt"
+        ]);
+
+        function showMessage(text, type = "error") {
+            message.textContent = text;
+            message.className = "message " + type;
+        }
+
+        function clearMessage() {
+            message.textContent = "";
+            message.className = "message";
+        }
+
+        // POST JSON to our own API and return the parsed answer.
+        // Throws an Error with a readable message on any failure.
+        async function postJson(url, body) {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                credentials: "same-origin"
+            });
+
+            if (response.status === 401) {
+                window.location.href = "/login";
+                throw new Error("Please log in again.");
+            }
+
+            let result = {};
+            try {
+                result = await response.json();
+            } catch (ignored) {
+                // no JSON body; fall through to the generic message
+            }
+
+            if (!response.ok) {
+                if (response.status === 503) {
+                    throw new Error("File storage is not configured on the server.");
+                }
+                if (response.status === 403) {
+                    throw new Error("You do not have permission to upload assets.");
+                }
+                throw new Error(
+                    result.message || result.error || "Request failed (" + response.status + ")."
+                );
+            }
+
+            return result;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + " KB";
+            }
+            return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+        }
+
+        function setSelectedFile(file) {
+            clearMessage();
+
+            if (!file) {
+                selectedFile.textContent = "No file selected";
+                return;
+            }
+
+            const extension = file.name.split(".").pop().toLowerCase();
+
+            if (!allowedExtensions.has(extension)) {
+                fileInput.value = "";
+                selectedFile.textContent = "No file selected";
+                showMessage("This file type is not supported.");
+                return;
+            }
+
+            if (file.size > MAX_FILE_SIZE) {
+                fileInput.value = "";
+                selectedFile.textContent = "No file selected";
+                showMessage("File exceeds the 50 MB size limit.");
+                return;
+            }
+
+            selectedFile.textContent =
+                file.name + " (" + formatSize(file.size) + ")";
+
+            if (!assetNameInput.value.trim()) {
+                assetNameInput.value = file.name.replace(/\.[^.]+$/, "");
+            }
+        }
+
+        dropZone.addEventListener("click", () => fileInput.click());
+
+        dropZone.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                fileInput.click();
+            }
         });
 
-        if (response.status === 401) {
-            window.location.href = "/login";
-            throw new Error("Please log in again.");
-        }
+        fileInput.addEventListener("change", () => {
+            setSelectedFile(fileInput.files[0]);
+        });
 
-        let result = {};
-        try {
-            result = await response.json();
-        } catch (ignored) {
-            // the server sent no JSON; fall through to the generic message
-        }
-
-        if (!response.ok) {
-            if (response.status === 503) {
-                throw new Error("File storage is not configured on the server.");
-            }
-            if (response.status === 403) {
-                throw new Error("You do not have permission to upload assets.");
-            }
-            throw new Error(
-                result.message || result.error || "Request failed (" + response.status + ")."
-            );
-        }
-
-        return result;
-    }
-
-    uploadForm.addEventListener("submit", async function (event) {
-        event.preventDefault();
-
-        const file = fileInput.files[0];
-
-        if (!file) {
-            uploadMessage.textContent = "Please choose a file first.";
-            return;
-        }
-
-        if (!nameInput.value.trim()) {
-            uploadMessage.textContent = "Please enter an asset name.";
-            return;
-        }
-
-        if (file.size === 0) {
-            uploadMessage.textContent = "The selected file is empty.";
-            return;
-        }
-
-        if (file.size > MAX_UPLOAD_SIZE) {
-            uploadMessage.textContent = "Maximum upload size is 50 MB.";
-            return;
-        }
-
-        const contentType = file.type || "application/octet-stream";
-
-        uploadButton.disabled = true;
-        uploadButton.textContent = "Uploading...";
-
-        try {
-            // 1. Create the asset record (permanent publicId, no file yet).
-            uploadMessage.textContent = "Creating asset...";
-            const created = await postJson("/api/assets", {
-                name: nameInput.value.trim(),
-                tags: tagsInput.value,
-                filename: file.name
+        ["dragenter", "dragover"].forEach((eventName) => {
+            dropZone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                dropZone.classList.add("dragging");
             });
-            const assetId = created.asset.id;
+        });
 
-            // 2. Ask the server for a one-time upload address.
-            uploadMessage.textContent = "Preparing upload...";
-            const presigned = await postJson("/api/assets/presign-upload", {
-                assetId: assetId,
-                filename: file.name,
-                contentType: contentType
+        ["dragleave", "drop"].forEach((eventName) => {
+            dropZone.addEventListener(eventName, (event) => {
+                event.preventDefault();
+                dropZone.classList.remove("dragging");
             });
+        });
 
-            // 3. Send the file straight to storage. The Content-Type must be
-            //    exactly the one the address was signed for.
-            uploadMessage.textContent = "Uploading your file...";
-            let putResponse;
+        dropZone.addEventListener("drop", (event) => {
+            const files = event.dataTransfer.files;
+
+            if (!files.length) return;
+
             try {
-                putResponse = await fetch(presigned.uploadUrl, {
-                    method: "PUT",
-                    headers: { "Content-Type": contentType },
-                    body: file
+                const transfer = new DataTransfer();
+                transfer.items.add(files[0]);
+                fileInput.files = transfer.files;
+                setSelectedFile(files[0]);
+            } catch (error) {
+                showMessage("Could not select the dropped file. Please browse for it instead.");
+            }
+        });
+
+        uploadForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            clearMessage();
+
+            const file = fileInput.files[0];
+            const name = assetNameInput.value.trim();
+
+            if (!file) {
+                showMessage("Please select a file to upload.");
+                return;
+            }
+
+            if (!name) {
+                showMessage("Please enter an asset name.");
+                assetNameInput.focus();
+                return;
+            }
+
+            if (file.size > MAX_FILE_SIZE) {
+                showMessage("File exceeds the 50 MB size limit.");
+                return;
+            }
+
+            const extension = file.name.split(".").pop().toLowerCase();
+
+            if (!allowedExtensions.has(extension)) {
+                showMessage("This file type is not supported.");
+                return;
+            }
+
+            uploadButton.disabled = true;
+            uploadButton.textContent = "Uploading...";
+
+            try {
+                const contentType = file.type || "application/octet-stream";
+                const tags = uploadForm.elements["tags"]
+                    ? uploadForm.elements["tags"].value
+                    : "";
+
+                // 1. Create the asset record (permanent public ID, no file yet).
+                showMessage("Creating asset...", "success");
+                const created = await postJson("/api/assets", {
+                    name: name,
+                    tags: tags,
+                    filename: file.name
                 });
-            } catch (networkError) {
-                throw new Error(
-                    "Could not reach file storage. Is MinIO running?"
+                const assetId = created.asset.id;
+
+                // 2. Ask the server for a one-time upload address.
+                showMessage("Preparing upload...", "success");
+                const presigned = await postJson("/api/assets/presign-upload", {
+                    assetId: assetId,
+                    filename: file.name,
+                    contentType: contentType
+                });
+
+                // 3. Send the file straight to storage. The Content-Type must be
+                //    exactly the one the address was signed for.
+                showMessage("Uploading your file...", "success");
+                let putResponse;
+                try {
+                    putResponse = await fetch(presigned.uploadUrl, {
+                        method: "PUT",
+                        headers: { "Content-Type": contentType },
+                        body: file
+                    });
+                } catch (networkError) {
+                    throw new Error("Could not reach file storage. Is MinIO running?");
+                }
+
+                if (!putResponse.ok) {
+                    throw new Error(
+                        "Storage rejected the file (" + putResponse.status + ")."
+                    );
+                }
+
+                // 4. Make sure the file really arrived.
+                showMessage("Checking the upload...", "success");
+                await postJson(
+                    "/api/assets/" + assetId + "/confirm-upload",
+                    { storageKey: presigned.storageKey }
                 );
-            }
 
-            if (!putResponse.ok) {
-                throw new Error(
-                    "Storage rejected the file (" + putResponse.status + ")."
+                // 5. Make it the live version.
+                showMessage("Publishing...", "success");
+                await postJson(
+                    "/api/assets/" + assetId + "/replace-version",
+                    { storageKey: presigned.storageKey }
                 );
+
+                showMessage("Upload successful! Opening your assets...", "success");
+                uploadButton.textContent = "Uploaded!";
+
+                window.location.assign("/assets");
+
+            } catch (error) {
+                console.error("Upload failed:", error);
+                showMessage(error.message || "Upload failed. Check the Flask terminal.");
+
+                uploadButton.disabled = false;
+                uploadButton.textContent = "Upload Asset";
             }
-
-            // 4. Make sure the file really arrived.
-            uploadMessage.textContent = "Checking the upload...";
-            await postJson(
-                "/api/assets/" + assetId + "/confirm-upload",
-                { storageKey: presigned.storageKey }
-            );
-
-            // 5. Make it the live version.
-            uploadMessage.textContent = "Publishing...";
-            await postJson(
-                "/api/assets/" + assetId + "/replace-version",
-                { storageKey: presigned.storageKey }
-            );
-
-            uploadMessage.textContent =
-                "Upload successful! Asset ID: " + assetId;
-
-            uploadForm.reset();
-            selectedFile.textContent = "No file selected";
-
-            setTimeout(function () {
-                window.location.href = "/assets";
-            }, 1000);
-
-        } catch (error) {
-            uploadMessage.textContent = error.message;
-        } finally {
-            uploadButton.disabled = false;
-            uploadButton.textContent = "Upload Asset";
-        }
-    });
-</script>
-
-{% endblock %}
+        });
+    </script>
+</body>
+</html>

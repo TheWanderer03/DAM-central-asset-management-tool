@@ -12,14 +12,14 @@
         <p>Manage and track your digital assets in one place.</p>
     </div>
 
-    <button class="primary-button"
-            onclick="alert('Upload feature coming soon!')">
+    <a href="{{ url_for('dashboard.upload_page') }}"
+       class="primary-button"
+       style="text-decoration: none; display: inline-block;">
         + Upload Asset
-    </button>
+    </a>
 </div>
 
 <div class="stats-grid">
-
     <div class="stat-card">
         <div class="stat-label">Total Assets</div>
         <div class="stat-value" id="total-assets">--</div>
@@ -34,16 +34,12 @@
 
     <div class="stat-card">
         <div class="stat-label">Workspace Status</div>
-        <div class="stat-value" style="font-size: 24px;">
-            Active
-        </div>
+        <div class="stat-value" style="font-size: 24px;">Active</div>
         <div class="stat-note">Your workspace is ready</div>
     </div>
-
 </div>
 
 <div class="panel">
-
     <div class="panel-heading">
         <h2>Recent Assets</h2>
         <span>Workspace overview</span>
@@ -56,16 +52,16 @@
                 <th>Type</th>
                 <th>Tags</th>
                 <th>Status</th>
+                <th>Actions</th>
             </tr>
         </thead>
 
         <tbody id="asset-list">
             <tr>
-                <td colspan="4">Loading assets...</td>
+                <td colspan="5">Loading assets...</td>
             </tr>
         </tbody>
     </table>
-
 </div>
 
 <script>
@@ -91,26 +87,23 @@
 
             const assets = await response.json();
 
-            // Update the statistics.
             totalAssets.textContent = assets.length;
 
             const types = new Set(
                 assets
                     .map(asset => asset.type)
-                    .filter(type => type)
+                    .filter(Boolean)
             );
 
             assetTypes.textContent = types.size;
 
-            // Remove the loading or placeholder row.
             assetList.replaceChildren();
 
-            // Show a message if the workspace has no assets.
             if (assets.length === 0) {
                 const row = document.createElement("tr");
                 const cell = document.createElement("td");
 
-                cell.colSpan = 4;
+                cell.colSpan = 5;
                 cell.textContent =
                     "No assets found in your workspace yet.";
 
@@ -119,7 +112,6 @@
                 return;
             }
 
-            // Display the five most recent assets.
             assets.slice(0, 5).forEach(asset => {
                 const row = document.createElement("tr");
 
@@ -137,11 +129,88 @@
                 const statusCell = document.createElement("td");
                 statusCell.textContent = "Available";
 
+                const actionsCell = document.createElement("td");
+
+                // View and edit asset.
+                const editLink = document.createElement("a");
+                editLink.href =
+                    `/assets/${encodeURIComponent(asset.id)}`;
+                editLink.textContent = "View / Edit";
+                editLink.style.textDecoration = "none";
+
+                actionsCell.appendChild(editLink);
+
+                // Remove asset.
+                const removeButton = document.createElement("button");
+                removeButton.type = "button";
+                removeButton.textContent = "Remove";
+                removeButton.style.marginLeft = "10px";
+                removeButton.style.cursor = "pointer";
+
+                removeButton.addEventListener("click", async () => {
+                    const confirmed = window.confirm(
+                        `Remove "${asset.name || "Untitled"}" from your workspace?`
+                    );
+
+                    if (!confirmed) {
+                        return;
+                    }
+
+                    removeButton.disabled = true;
+                    removeButton.textContent = "Removing...";
+
+                    try {
+                        const deleteResponse = await fetch(
+                            `/api/assets/${encodeURIComponent(asset.id)}`,
+                            {
+                                method: "DELETE",
+                                credentials: "same-origin"
+                            }
+                        );
+
+                        const result = await deleteResponse
+                            .json()
+                            .catch(() => ({}));
+
+                        if (deleteResponse.status === 401) {
+                            window.location.href = "/login";
+                            return;
+                        }
+
+                        if (deleteResponse.status === 403) {
+                            throw new Error(
+                                "You do not have permission to remove assets."
+                            );
+                        }
+
+                        if (!deleteResponse.ok) {
+                            throw new Error(
+                                result.message ||
+                                "Could not remove this asset."
+                            );
+                        }
+
+                        await loadDashboard();
+
+                    } catch (error) {
+                        window.alert(
+                            error.message ||
+                            "Could not remove this asset."
+                        );
+
+                        removeButton.disabled = false;
+                        removeButton.textContent = "Remove";
+                    }
+                });
+
+                actionsCell.appendChild(removeButton);
+
                 row.append(
                     nameCell,
                     typeCell,
                     tagsCell,
-                    statusCell
+                    statusCell,
+                    actionsCell
                 );
 
                 assetList.appendChild(row);
@@ -158,7 +227,7 @@
             const row = document.createElement("tr");
             const cell = document.createElement("td");
 
-            cell.colSpan = 4;
+            cell.colSpan = 5;
             cell.textContent =
                 "Could not load assets. Please refresh the page and try again.";
 
@@ -171,4 +240,3 @@
 </script>
 
 {% endblock %}
-
