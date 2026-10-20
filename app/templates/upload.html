@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 
 {% block title %}Upload Assets | AssetVault{% endblock %}
@@ -75,8 +74,11 @@
 </div>
 
 <script>
+    const MAX_UPLOAD_SIZE = 50 * 1024 * 1024; // keep in sync with the server
+
     const fileInput = document.getElementById("asset-file");
     const nameInput = document.getElementById("asset-name");
+    const tagsInput = document.getElementById("asset-tags");
     const selectedFile = document.getElementById("selected-file");
     const uploadForm = document.getElementById("upload-form");
     const uploadMessage = document.getElementById("upload-message");
@@ -112,10 +114,48 @@
         return (bytes / (1024 * 1024)).toFixed(1) + " MB";
     }
 
+    // POST JSON to our own API and return the parsed answer.
+    // Throws an Error with a readable message on any failure.
+    async function postJson(url, body) {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+        });
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            throw new Error("Please log in again.");
+        }
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (ignored) {
+            // the server sent no JSON; fall through to the generic message
+        }
+
+        if (!response.ok) {
+            if (response.status === 503) {
+                throw new Error("File storage is not configured on the server.");
+            }
+            if (response.status === 403) {
+                throw new Error("You do not have permission to upload assets.");
+            }
+            throw new Error(
+                result.message || result.error || "Request failed (" + response.status + ")."
+            );
+        }
+
+        return result;
+    }
+
     uploadForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
-        if (!fileInput.files.length) {
+        const file = fileInput.files[0];
+
+        if (!file) {
             uploadMessage.textContent = "Please choose a file first.";
             return;
         }
@@ -125,28 +165,77 @@
             return;
         }
 
-        const formData = new FormData(uploadForm);
+        if (file.size === 0) {
+            uploadMessage.textContent = "The selected file is empty.";
+            return;
+        }
+
+        if (file.size > MAX_UPLOAD_SIZE) {
+            uploadMessage.textContent = "Maximum upload size is 50 MB.";
+            return;
+        }
+
+        const contentType = file.type || "application/octet-stream";
 
         uploadButton.disabled = true;
         uploadButton.textContent = "Uploading...";
-        uploadMessage.textContent = "Uploading your asset...";
 
         try {
-            const response = await fetch("/api/assets/upload", {
-                method: "POST",
-                body: formData
+            // 1. Create the asset record (permanent publicId, no file yet).
+            uploadMessage.textContent = "Creating asset...";
+            const created = await postJson("/api/assets", {
+                name: nameInput.value.trim(),
+                tags: tagsInput.value,
+                filename: file.name
+            });
+            const assetId = created.asset.id;
+
+            // 2. Ask the server for a one-time upload address.
+            uploadMessage.textContent = "Preparing upload...";
+            const presigned = await postJson("/api/assets/presign-upload", {
+                assetId: assetId,
+                filename: file.name,
+                contentType: contentType
             });
 
-            const result = await response.json();
-
-            if (!response.ok) {
+            // 3. Send the file straight to storage. The Content-Type must be
+            //    exactly the one the address was signed for.
+            uploadMessage.textContent = "Uploading your file...";
+            let putResponse;
+            try {
+                putResponse = await fetch(presigned.uploadUrl, {
+                    method: "PUT",
+                    headers: { "Content-Type": contentType },
+                    body: file
+                });
+            } catch (networkError) {
                 throw new Error(
-                    result.message || result.error || "Upload failed."
+                    "Could not reach file storage. Is MinIO running?"
                 );
             }
 
+            if (!putResponse.ok) {
+                throw new Error(
+                    "Storage rejected the file (" + putResponse.status + ")."
+                );
+            }
+
+            // 4. Make sure the file really arrived.
+            uploadMessage.textContent = "Checking the upload...";
+            await postJson(
+                "/api/assets/" + assetId + "/confirm-upload",
+                { storageKey: presigned.storageKey }
+            );
+
+            // 5. Make it the live version.
+            uploadMessage.textContent = "Publishing...";
+            await postJson(
+                "/api/assets/" + assetId + "/replace-version",
+                { storageKey: presigned.storageKey }
+            );
+
             uploadMessage.textContent =
-                "Upload successful! Asset ID: " + result.asset.id;
+                "Upload successful! Asset ID: " + assetId;
 
             uploadForm.reset();
             selectedFile.textContent = "No file selected";

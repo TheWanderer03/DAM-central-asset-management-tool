@@ -1,4 +1,3 @@
-
 import os
 import secrets
 import uuid
@@ -49,6 +48,24 @@ ALLOWED_UPLOAD_EXTENSIONS = {
 }
 
 MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
+
+IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
+VIDEO_EXTENSIONS = {"mp4", "webm", "mov"}
+
+
+def classify_upload(filename):
+    """Return the asset type for an allowed filename, or None if not allowed."""
+    if not isinstance(filename, str):
+        return None
+    base = os.path.basename(filename.replace("\\", "/"))
+    extension = os.path.splitext(base)[1].lstrip(".").lower()
+    if extension not in ALLOWED_UPLOAD_EXTENSIONS:
+        return None
+    if extension in IMAGE_EXTENSIONS:
+        return "image"
+    if extension in VIDEO_EXTENSIONS:
+        return "video"
+    return "document"
 
 
 # ---------------------------------------------------------
@@ -107,6 +124,9 @@ def list_assets():
         org_id=g.user.org_id,
         deleted=False,
     )
+
+    # Hide half-finished uploads (assets that never got a live version).
+    query = query.filter(Asset.current_version_id.isnot(None))
 
     search_query = request.args.get("q", "").strip()
     tag = request.args.get("tag", "").strip()
@@ -190,6 +210,58 @@ def get_asset(asset_id):
         ],
     )
 
+
+@bp.post("/api/assets")
+@require_role("editor")
+def create_asset():
+    data = request.get_json(silent=True) or {}
+
+    name = str(data.get("name", "")).strip()
+    if not name or len(name) > 200:
+        return jsonify(
+            error="validation_error",
+            message="Asset name is required (200 characters or fewer).",
+        ), 400
+
+    asset_type = classify_upload(data.get("filename"))
+    if asset_type is None:
+        return jsonify(
+            error="unsupported_file_type",
+            message="This file type is not allowed.",
+        ), 400
+
+    raw_tags = data.get("tags", [])
+    if isinstance(raw_tags, str):
+        raw_tags = raw_tags.split(",")
+    if not isinstance(raw_tags, list):
+        return jsonify(
+            error="validation_error",
+            message="Tags must be a list or a comma-separated string.",
+        ), 400
+    tags = list(dict.fromkeys(
+        str(tag).strip() for tag in raw_tags if str(tag).strip()
+    ))
+
+    asset = Asset(
+        org_id=g.user.org_id,
+        public_id=f"ast_{uuid.uuid4().hex}",
+        name=name,
+        type=asset_type,
+        tags=tags,
+        deleted=False,
+    )
+    db.session.add(asset)
+    db.session.flush()
+
+    # audit() commits the transaction
+    audit(g.user.org_id, f"user:{g.user.id}", "asset.created", asset.id)
+
+    return jsonify(
+        message="Asset created. Now upload its file.",
+        asset=asset_dict(asset),
+    ), 201
+
+
 @bp.post("/api/assets/presign-upload")
 @require_role("editor")
 def presign_upload():
@@ -212,6 +284,9 @@ def presign_upload():
     content_type = data.get("contentType") or "application/octet-stream"
     if not isinstance(filename, str) or not isinstance(content_type, str):
         return jsonify(error="filename and contentType must be strings"), 400
+    if classify_upload(filename) is None:
+        return jsonify(error="unsupported_file_type",
+                       message="This file type is not allowed."), 400
 
     storage_key = build_storage_key(asset.id, filename)
     upload_url = generate_presigned_upload_url(storage_key, content_type)
@@ -278,6 +353,10 @@ def replace_version(asset_id):
         raise
     if info is None:
         return jsonify(error="cloud storage not configured"), 503
+
+    if info["sizeBytes"] > MAX_UPLOAD_SIZE:
+        return jsonify(error="file_too_large",
+                       message="Maximum upload size is 50 MB."), 413
 
     latest_version = (
         AssetVersion.query.filter_by(asset_id=asset.id)
